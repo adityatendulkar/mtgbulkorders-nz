@@ -1,0 +1,4 @@
+prices/
+.venv/
+__pycache__/
+*.pyc

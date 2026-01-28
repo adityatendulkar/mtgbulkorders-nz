@@ -1,0 +1,260 @@
+# MTG Card Optimizer Configuration File
+
+# Vendor penalty for each additional vendor used
+vendor_penalty: 0.00
+
+# List of vendors
+vendors:
+  - badgerssett
+  - baydragon
+  - beadnd
+  - calicokeep
+  - cardbard
+  - cardcabin
+  - cardmasters
+  - cardmerchant
+  - cardmerchantchristchurch
+  - cardmerchantnelson
+  - cardmerchanttakapuna
+  - cardmerchantwellington
+  - cardmerchantwhangarei
+  - gamingdna
+  - goblingames
+  - hobbylords
+  - hobbymaster
+  - ironknightgaming
+  - magicatwillis
+  - magicmagpie
+  - novagames
+  - nztradingcards
+  - otakumart
+  - shuffleandcut
+  - spellbound
+  - tcgcollectornz
+  - threetreemarket
+  - valkyriegames
+  - xpgames
+
+# Shipping costs per vendor
+shipping_costs:
+  baydragon: 6.00
+  spellbound: 8.00
+  hobbymaster: 2.00
+  beadnd: 8.00
+  threetreemarket: 9.50
+  goblingames: 8.00
+  cardmerchanttakapuna: 4.00
+  cardmerchantwhangarei: 0.00
+  shuffleandcut: 0
+  ironknightgaming: 15.00
+  cardcabin: 7.50
+  cardbard: 6.50
+  otakumart: 7.00
+  cardmerchantwellington: 6.90
+  tcgcollectornz: 8.00
+  calicokeep: 6.00
+  xpgames: 6.00
+  nztradingcards: 7.50
+  valkyriegames: 10.00
+  magicmagpie: 12.50
+  novagames: 4.00
+  magicatwillis: 8.00
+  gamingdna: 10.00
+  cardmerchantnelson: 12.00
+  cardmerchantchristchurch: 10.00
+  cardmerchant: 6.00
+  cardmasters: 9.00
+  hobbylords: 10.00
+  badgerssett: 8.00
+
+# Vendor-specific discounts (multiplier, e.g., 0.75 = 25% off)
+vendor_discounts:
+  beadnd: 0.75  # 25% discount
+
+# MANDATORY cards to purchase (must buy all available)
+cards:
+  - Ash Barrens
+  # Temple cycle
+  - Temple of Enlightenment
+  - Temple of Deceit
+  - Temple of Malice
+  - Temple of Abandon
+  - Temple of Plenty
+  - Temple of Epiphany
+  - Temple of Silence
+  - Temple of Malady
+  - Temple of Triumph
+  - Temple of Mystery
+  # Painland cycle
+  - Adarkar Wastes
+  - Underground River
+  - Sulfurous Springs
+  - Karplusan Forest
+  - Brushland
+  - Shivan Reef
+  - Caves of Koilos
+  - Llanowar Wastes
+  - Battlefield Forge
+  - Yavimaya Coast
+  # Fastland cycle
+  - Seachrome Coast
+  - Darkslick Shores
+  - Blackcleave Cliffs
+  - Copperline Gorge
+  - Razorverge Thicket
+  - Spirebluff Canal
+  - Concealed Courtyard
+  - Blooming Marsh
+  - Inspiring Vantage
+  - Botanical Sanctum
+  # Other mandatory cards
+  - Metallic Mimic
+  - Naru Meha, Master Wizard
+  - Liliana's Contract
+# OPTIONAL cards (optimizer will select the most cost-effective ones)
+optional_cards:
+  - Arcbound Mouser
+  - Champion of the Parish
+  - Arcbound Prototype
+  - Cathar Commando
+  - Giada, Font of Hope
+  - Hero of Precinct One
+  - Luminarch Aspirant
+  - Thalia's Lieutenant
+  - Mentor of the Meek
+  - Werefox Bodyguard
+  - Basri's Lieutenant
+  - Lossarnach Captain
+  - Steel Seraph
+  - Condemn
+  - Joust Through
+  - Battle Menu
+  - Fateful Absence
+  - Oust
+  - Declaration in Stone
+  - Exorcise
+  - Merfolk Trickster
+  - Chasm Skulker
+  - Sage of Fables
+  - Cynette, Jelly Drover
+  - Master of Winds
+  - Whirler Rogue
+  - Into the Roil
+  - Think Twice
+  - Turn to Frog
+  - Neutralize
+  - Wizard's Retort
+  - Step Through
+  - Favorable Winds
+  - Noggle the Mind
+  - Stasis Field
+  - Bloodsoaked Champion
+  - Carrion Feeder
+  - Changeling Outcast
+  - Dockside Chef
+  - Dreadmalkin
+  - Mortician Beetle
+  - Retrofitted Transmogrant
+  - Shambling Ghast
+  - Stitcher's Supplier
+  - Lampad of Death's Vigil
+  - Lightless Evangel
+  - Reassembling Skeleton
+  - Woe Strider
+  - Xathrid Necromancer
+  - Demon of Catastrophes
+  - Shadowborn Demon
+  - Disfigure
+  - Lash of Malice
+  - Zuko's Conviction
+  - Circle of Power
+  - Clockwork Percussionist
+  - Dragonmaster Outcast
+  - Ghitu Lavarunner
+  - Vindictive Flamestoker
+  - Kari Zev, Skyship Raider
+  - Scrapwork Mutt
+  - Bogardan Dragonheart
+  - Guttersnipe
+  - Krenko, Tin Street Kingpin
+  - Magma Jet
+  - Wizard's Lightning
+  - Pyroclasm
+  - Pelt Collector
+  - Dragonsguard Elite
+  - Incubation Druid
+  - Priest of Titania
+  - Viridian Zealot
+  - Oran-Rief Ooze
+  - Hard-Hitting Question
+  - Fangs of Kalonia
+  - Hangarback Walker
+  - Marketback Walker
+  - Hope of Ghirapur
+  - Iron Apprentice
+  - Sparring Construct
+  - Arcbound Ravager
+  - Myr Sire
+  - Perilous Myr
+  - Adaptive Automaton
+  - Bloodline Pretender
+  - Chromatic Sphere
+  - Chromatic Star
+  - Prismatic Lens
+  - Prophetic Prism
+  - All-Fates Scroll
+  - Empyrean Eagle
+  - Spell Queller
+  - Aven Wind Guide
+  - Kykar, Zephyr Awakener
+  - Twining Twins
+  - Yorion, Sky Nomad
+  - Footlight Fiend
+  - Fireblade Artist
+  - Juri, Master of the Revue
+  - Judith, the Scourge Diva
+  - Black Waltz No. 3
+  - Brawl-Bash Ogre
+  - Decadent Dragon
+  - Falkenrath Aristocrat
+  - Garna, Bloodfist of Keld
+  - Obosh, the Preypiercer
+  - Picnic Ruiner
+  - Ruby, Daring Tracker
+  - Draconic Disciple
+  - Grumgully, the Generous
+  - Jolene, Plundering Pugilist
+  - Ghor-Clan Rampager
+  - Anthem of Champions
+  - Burrowguard Mentor
+  - Call of the Conclave
+  - Dromoka's Command
+  - Finneas, Ace Archer
+  - Dawnhart Wardens
+  - Faeburrow Elder
+  - Good-Fortune Unicorn
+  - Ironroot Warlord
+  - King Darien XLVIII
+  - Knight of Autumn
+  - Conclave Cavalier
+  - Knight of New Alara
+  - General Kudro of Drannith
+  - Adeliz, the Cinder Wind
+  - Umara Mystic
+  - Lluwen, Imperfect Naturalist
+  - Akroan Hoplite
+  - Arabella, Abandoned Doll
+  - Lightning Helix
+  - Rip Apart
+  - Sacred Fire
+  - Quandrix Apprentice
+  - Simic Ascendancy
+  - Bred for the Hunt
+  - Quandrix Command
+  - Vorel of the Hull Clade
+  - Zegana, Utopian Speaker
+  - Fusion Elemental
+
+# Minimum number of optional cards that must be purchased
+# The optimizer will select at least this many from the optional_cards list
+min_optional_cards: 100
