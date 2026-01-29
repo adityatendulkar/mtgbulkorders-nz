@@ -175,6 +175,16 @@ def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_
         f.write(f"Total cost (including shipping): ${total_cost:.2f}\n")
         f.write(f"Cards purchased: {mandatory_purchased} mandatory, {optional_purchased} optional\n")
         
+        # Determine which optional cards were not purchased
+        optional_not_purchased = [c for c in available_optional if y[c].value() == 0]
+        
+        if optional_not_purchased:
+            f.write(f"\n" + "=" * 60 + "\n")
+            f.write(f"OPTIONAL CARDS NOT PURCHASED ({len(optional_not_purchased)}):")
+            f.write(f"\nThe following optional cards were available but not selected by the optimiser:\n\n")
+            for card in sorted(optional_not_purchased):
+                f.write(f"  - {card}\n")
+        
         if unavailable_cards:
             f.write(f"\n" + "=" * 60 + "\n")
             f.write(f"UNAVAILABLE CARDS ({len(unavailable_cards)}):")
@@ -184,5 +194,8 @@ def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_
     
     print(f"\nResults saved to {output_file}")
     print(f"Total cost: ${total_cost:.2f}")
+    print(f"Cards purchased: {mandatory_purchased} mandatory, {optional_purchased}/{len(available_optional)} optional")
+    if optional_not_purchased:
+        print(f"Optional cards not purchased: {len(optional_not_purchased)}")
     if unavailable_cards:
         print(f"Unavailable cards: {len(unavailable_cards)}")

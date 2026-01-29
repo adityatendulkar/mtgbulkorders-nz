@@ -118,10 +118,11 @@ def scrape_prices(cards, vendors, optional_cards=None):
             time.sleep(1 + (idx % 3))  # 1-3 second delay
     
     # Build structured data for MILP
-    cards_set = sorted({card for (card, _) in K.keys()})
+    # Use all_cards instead of just cards_set to ensure cards with no data are included
+    all_cards_lower = [card.lower() for card in all_cards]
     
     K_temp = []
-    for card in cards_set:
+    for card in sorted(all_cards_lower):
         for vendor in vendors:
             price = K.get((card, vendor), BIG_M)
             K_temp.append({

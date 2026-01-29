@@ -69,7 +69,7 @@ shipping_costs:
 
 # Vendor-specific discounts (multiplier, e.g., 0.75 = 25% off)
 vendor_discounts:
-  beadnd: 0.75  # 25% discount
+  #beadnd: 0.75  # 25% discount
 
 # MANDATORY cards to purchase (must buy all available)
 cards:
