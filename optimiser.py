@@ -7,7 +7,7 @@ import pulp
 BIG_M = 9999.0  # Price representing unavailable cards
 
 
-def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_discounts=None, mandatory_cards=None, optional_cards=None, min_optional_cards=0):
+def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_discounts=None, mandatory_cards=None, optional_cards=None, min_optional_cards=0, cities_im_in=None):
     """Solve the MILP to minimize total cost.
     
     Args:
@@ -27,14 +27,19 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
     else:
         # It's already the data
         K_json = K_json_or_file
-    
+                
     if vendor_discounts is None:
         vendor_discounts = {}
     if mandatory_cards is None:
         mandatory_cards = []
     if optional_cards is None:
         optional_cards = []
-    
+    for vendor in shipping_costs:
+        if shipping_costs[vendor][1] in cities_im_in:
+            shipping_costs[vendor] = shipping_costs[vendor][2]  # Pick up cost
+        else:
+            shipping_costs[vendor] = shipping_costs[vendor][0]  # Use the first element (shipping cost)
+
     # Convert to lowercase for matching
     mandatory_cards_lower = set(c.lower() for c in mandatory_cards)
     optional_cards_lower = set(c.lower() for c in optional_cards)
@@ -152,6 +157,11 @@ def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_
         f.write(f"Status: {pulp.LpStatus[model.status]}\n\n")
         
         for v in vendors:
+            purchased_cards = [c for c in cards if z[v, c].value() == 1]
+
+            if not purchased_cards:
+                continue  # Skip vendor entirely if no cards bought
+
             if x[v].value() == 1:
                 vendor_total = shipping_costs.get(v, 0)  # Start with shipping cost
                 f.write(f"Use vendor: {v} (shipping: ${shipping_costs.get(v, 0):.2f})\n")

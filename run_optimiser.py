@@ -84,11 +84,20 @@ def main():
     except (FileNotFoundError, ValueError) as e:
         print(f"\nError: {e}")
         return
+
+    pickup_cities = config.get("pickup_cities", {})
+    cities_im_in = []
+    if pickup_cities is not None:
+        for city in pickup_cities:
+            if pickup_cities[city] != 0:
+                cities_im_in.append(city)
     
     print(f"   - Vendor penalty: ${config['vendor_penalty']:.2f}")
     print(f"   - Vendors: {len(config['vendors'])}")
     print(f"   - Mandatory cards: {len(config['cards'])}")
     print(f"   - Optional cards: {len(config['optional_cards'])}")
+    print(f"   - Cities for Pickup: {', '.join(cities_im_in)}")
+
     if config['min_optional_cards'] > 0:
         print(f"   - Minimum optional cards required: {config['min_optional_cards']}")
     if config.get('vendor_discounts'):
@@ -126,7 +135,8 @@ def main():
         config.get("vendor_discounts", {}),
         config["cards"],
         config["optional_cards"],
-        config["min_optional_cards"]
+        config["min_optional_cards"],
+        cities_im_in
     )
     
     # Save results

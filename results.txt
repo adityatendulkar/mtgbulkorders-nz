@@ -1,0 +1,14 @@
+Status: Optimal
+
+Use vendor: otakumart (shipping: $0.00)
+  Buy ash barrens at $0.25
+  Subtotal for otakumart: $0.25
+
+Total cost (including shipping): $0.25
+Cards purchased: 1 mandatory, 0 optional
+
+============================================================
+OPTIONAL CARDS NOT PURCHASED (1):
+The following optional cards were available but not selected by the optimiser:
+
+  - arcbound mouser
