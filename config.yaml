@@ -1,10 +1,10 @@
 # MTG Card Optimizer Configuration File
 
-# Vendor penalty for each additional vendor used
-# If this is higher, the optimizer will prefer fewer vendors
+# Vendor dollar penalty for each additional vendor used
+# If this is higher, the optimizer will prefer fewer vendors, but this may increase total cost
 vendor_penalty: 0.00
 
-# List of vendors
+# List of vendors, remove any vendors you do not wish to use
 vendors:
   - badgerssett
   - baydragon
@@ -129,8 +129,14 @@ cards:
   # - Naru Meha, Master Wizard
   # - Liliana's Contract
 # OPTIONAL cards (optimizer will select the most cost-effective ones)
+# You can add tags to cards using square brackets: Card Name [tag1, tag2]
+# Then use tag_constraints below to control how many cards with each tag are selected
 optional_cards:
   - Arcbound Mouser
+  # Example with tags:
+  # - Carrion Feeder [black, sacrifice]
+  # - Bloodsoaked Champion [black, aggressive]
+  # - Mortician Beetle [black, sacrifice]
   # - Champion of the Parish
   # - Arcbound Prototype
   # - Cathar Commando
@@ -275,3 +281,16 @@ optional_cards:
 # Minimum number of optional cards that must be purchased
 # The optimizer will select at least this many from the optional_cards list
 min_optional_cards: 0
+
+# Tag constraints for cards
+# Format: tag_name: {minimum: X, maximum: Y, target: Z}
+# - minimum: minimum number of cards with this tag (optional)
+# - maximum: maximum number of cards with this tag (optional)
+# - target: exact number of cards with this tag (optional, overrides min/max)
+# Note: Tags are automatically extracted from card names using [tag1, tag2] syntax
+tag_constraints:
+  # black:
+  #   minimum: 5
+  #   maximum: 10
+  # sacrifice:
+  #   target: 3

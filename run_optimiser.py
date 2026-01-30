@@ -5,11 +5,33 @@ Scrapes prices, optimises vendor selection, and outputs purchasing plan
 
 import json
 import os
+import re
 import yaml
 from datetime import datetime
 
 from price_scraper import scrape_prices
 from optimiser import optimise_purchases, save_results
+
+
+def parse_card_with_tags(card_string):
+    """Parse a card string to extract the card name and tags.
+    
+    Args:
+        card_string: String like "Carrion Feeder [black, sacrifice]" or just "Ash Barrens"
+    
+    Returns:
+        tuple: (card_name, list_of_tags)
+    """
+    # Match pattern: "Card Name [tag1, tag2, tag3]"
+    match = re.match(r'^(.+?)\s*\[([^\]]+)\]\s*$', card_string.strip())
+    if match:
+        card_name = match.group(1).strip()
+        tags_str = match.group(2).strip()
+        tags = [tag.strip() for tag in tags_str.split(',')]
+        return card_name, tags
+    else:
+        # No tags
+        return card_string.strip(), []
 
 
 def load_config(config_file="config.yaml"):
@@ -63,6 +85,31 @@ def load_config(config_file="config.yaml"):
     # Validate min_optional_cards is a number
     if not isinstance(config["min_optional_cards"], (int, float)):
         raise ValueError("min_optional_cards must be a number")
+    
+    # Add tag_constraints if present, default to empty dict
+    if "tag_constraints" not in config:
+        config["tag_constraints"] = {}
+    
+    # Parse cards and optional_cards to extract tags
+    config["card_tags"] = {}  # Maps card_name -> list of tags
+    
+    # Process mandatory cards
+    parsed_mandatory_cards = []
+    for card_str in config["cards"]:
+        card_name, tags = parse_card_with_tags(card_str)
+        parsed_mandatory_cards.append(card_name)
+        if tags:
+            config["card_tags"][card_name.lower()] = tags
+    config["cards"] = parsed_mandatory_cards
+    
+    # Process optional cards
+    parsed_optional_cards = []
+    for card_str in config["optional_cards"]:
+        card_name, tags = parse_card_with_tags(card_str)
+        parsed_optional_cards.append(card_name)
+        if tags:
+            config["card_tags"][card_name.lower()] = tags
+    config["optional_cards"] = parsed_optional_cards
     
     # Add price_data_file if present, default to None
     if "price_data_file" not in config:
@@ -128,16 +175,25 @@ def main():
     # Optimise
     print("\n3. Optimising purchase plan...")
     # Pass the variable directly to optimisation (can also pass file path)
-    model, x, z, y, vendors, cards, K, unavailable_cards, available_mandatory, available_optional = optimise_purchases(
-        price_data,  # Pass variable instead of file path
-        config["shipping_costs"], 
-        config["vendor_penalty"],
-        config.get("vendor_discounts", {}),
-        config["cards"],
-        config["optional_cards"],
-        config["min_optional_cards"],
-        cities_im_in
-    )
+    try:
+        model, x, z, y, vendors, cards, K, unavailable_cards, available_mandatory, available_optional = optimise_purchases(
+            price_data,  # Pass variable instead of file path
+            config["shipping_costs"], 
+            config["vendor_penalty"],
+            config.get("vendor_discounts", {}),
+            config["cards"],
+            config["optional_cards"],
+            config["min_optional_cards"],
+            cities_im_in,
+            config.get("card_tags", {}),
+            config.get("tag_constraints", {})
+        )
+    except ValueError as e:
+        print(f"\n   ERROR: {e}")
+        print("\n" + "=" * 60)
+        print("Optimisation failed due to constraint conflicts!")
+        print("=" * 60)
+        return
     
     # Save results
     print("\n4. Saving results...")

@@ -7,7 +7,115 @@ import pulp
 BIG_M = 9999.0  # Price representing unavailable cards
 
 
-def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_discounts=None, mandatory_cards=None, optional_cards=None, min_optional_cards=0, cities_im_in=None):
+def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, available_optional):
+    """Validate that tag constraints can be satisfied with available cards.
+    
+    Args:
+        tag_constraints: Dictionary mapping tag -> {minimum, maximum, target}
+        card_tags: Dictionary mapping card_name (lowercase) -> list of tags
+        available_mandatory: List of available mandatory cards
+        available_optional: List of available optional cards
+        
+    Raises:
+        ValueError: If constraints cannot be satisfied
+    """
+    errors = []
+    
+    for tag, constraints in tag_constraints.items():
+        # Count mandatory and optional cards with this tag
+        mandatory_with_tag = [c for c in available_mandatory if tag in card_tags.get(c.lower(), [])]
+        optional_with_tag = [c for c in available_optional if tag in card_tags.get(c.lower(), [])]
+        
+        mandatory_count = len(mandatory_with_tag)
+        total_available = mandatory_count + len(optional_with_tag)
+        
+        # Check target constraint
+        if 'target' in constraints:
+            target = constraints['target']
+            if mandatory_count > target:
+                errors.append(
+                    f"Tag '{tag}': Cannot satisfy target={target}. "
+                    f"Already have {mandatory_count} mandatory cards with this tag: {', '.join(mandatory_with_tag)}"
+                )
+            elif total_available < target:
+                errors.append(
+                    f"Tag '{tag}': Cannot satisfy target={target}. "
+                    f"Only {total_available} cards available with this tag "
+                    f"({mandatory_count} mandatory + {len(optional_with_tag)} optional)"
+                )
+        
+        # Check minimum constraint
+        if 'minimum' in constraints:
+            minimum = constraints['minimum']
+            if total_available < minimum:
+                errors.append(
+                    f"Tag '{tag}': Cannot satisfy minimum={minimum}. "
+                    f"Only {total_available} cards available with this tag "
+                    f"({mandatory_count} mandatory + {len(optional_with_tag)} optional)"
+                )
+        
+        # Check maximum constraint
+        if 'maximum' in constraints:
+            maximum = constraints['maximum']
+            if mandatory_count > maximum:
+                errors.append(
+                    f"Tag '{tag}': Cannot satisfy maximum={maximum}. "
+                    f"Already have {mandatory_count} mandatory cards with this tag: {', '.join(mandatory_with_tag)}"
+                )
+        
+        # Check if minimum and maximum are compatible
+        if 'minimum' in constraints and 'maximum' in constraints:
+            if constraints['minimum'] > constraints['maximum']:
+                errors.append(
+                    f"Tag '{tag}': minimum ({constraints['minimum']}) is greater than maximum ({constraints['maximum']})"
+                )
+    
+    if errors:
+        error_msg = "Tag constraint validation failed:\n   - " + "\n   - ".join(errors)
+        raise ValueError(error_msg)
+    
+    print("Tag constraints validated successfully")
+
+
+def add_tag_constraints(model, tag_constraints, card_tags, available_mandatory, available_optional, z, y, vendors):
+    """Add tag constraints to the optimization model.
+    
+    Args:
+        model: PuLP model to add constraints to
+        tag_constraints: Dictionary mapping tag -> {minimum, maximum, target}
+        card_tags: Dictionary mapping card_name (lowercase) -> list of tags
+        available_mandatory: List of available mandatory cards
+        available_optional: List of available optional cards
+        z: Decision variables for card-vendor purchases
+        y: Decision variables for optional card selection
+        vendors: Set of vendors
+    """
+    for tag, constraints in tag_constraints.items():
+        # Find mandatory and optional cards with this tag
+        mandatory_with_tag = [c for c in available_mandatory if tag in card_tags.get(c.lower(), [])]
+        optional_with_tag = [c for c in available_optional if tag in card_tags.get(c.lower(), [])]
+        
+        # Build expression for total cards with this tag
+        # Mandatory cards are always purchased (sum over vendors = 1)
+        # Optional cards depend on y[c]
+        tag_total = (
+            len(mandatory_with_tag) +  # Mandatory cards always count
+            pulp.lpSum(y[c] for c in optional_with_tag)  # Optional cards only count if selected
+        )
+        
+        # Add constraints based on what's specified
+        if 'target' in constraints:
+            # Exact target
+            model += tag_total == constraints['target'], f"tag_{tag}_target"
+        else:
+            # Min/max constraints
+            if 'minimum' in constraints:
+                model += tag_total >= constraints['minimum'], f"tag_{tag}_min"
+            if 'maximum' in constraints:
+                model += tag_total <= constraints['maximum'], f"tag_{tag}_max"
+
+
+def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_discounts=None, mandatory_cards=None, optional_cards=None, min_optional_cards=0, cities_im_in=None, card_tags=None, tag_constraints=None):
     """Solve the MILP to minimize total cost.
     
     Args:
@@ -18,6 +126,9 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         mandatory_cards: List of cards that must be purchased
         optional_cards: List of cards that may be purchased
         min_optional_cards: Minimum number of optional cards to purchase
+        cities_im_in: List of cities where pickup is available
+        card_tags: Dictionary mapping card_name (lowercase) -> list of tags
+        tag_constraints: Dictionary mapping tag -> {minimum, maximum, target}
     """
     # Handle both file path and variable input
     if isinstance(K_json_or_file, str):
@@ -34,6 +145,10 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         mandatory_cards = []
     if optional_cards is None:
         optional_cards = []
+    if card_tags is None:
+        card_tags = {}
+    if tag_constraints is None:
+        tag_constraints = {}
     for vendor in shipping_costs:
         if shipping_costs[vendor][1] in cities_im_in:
             shipping_costs[vendor] = shipping_costs[vendor][2]  # Pick up cost
@@ -79,6 +194,7 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
             elif is_optional:
                 available_optional.append(card)
     
+    # List of all cards to consider in optimisation
     cards = set(available_mandatory + available_optional)
     unavailable_cards = unavailable_mandatory + unavailable_optional
     
@@ -94,6 +210,11 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
     
     if unavailable_mandatory or unavailable_optional:
         print(f"\n   Optimising for {len(available_mandatory)} mandatory + {len(available_optional)} optional cards...\n")
+    
+    # Validate tag constraints against available cards
+    if tag_constraints:
+        print("\n   Validating tag constraints...")
+        validate_tag_constraints(tag_constraints, card_tags, available_mandatory, available_optional)
     
     # Create problem
     model = pulp.LpProblem("MTG_Min_Cost", pulp.LpMinimize)
@@ -135,6 +256,10 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         actual_min = min(min_optional_cards, len(available_optional))
         model += pulp.lpSum(y[c] for c in available_optional) >= actual_min
     
+    # Tag constraints
+    if tag_constraints:
+        add_tag_constraints(model, tag_constraints, card_tags, available_mandatory, available_optional, z, y, vendors)
+    
     # Linking constraint: can only buy from vendor if we use that vendor
     for v in vendors:
         for c in cards:
@@ -143,6 +268,21 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
     # Solve
     print("\nSolving optimisation problem...")
     model.solve()
+    
+    # Check if solution is feasible
+    if model.status != pulp.LpStatusOptimal:
+        status_name = pulp.LpStatus[model.status]
+        if model.status == pulp.LpStatusInfeasible:
+            raise ValueError(
+                f"No feasible solution found. The constraints cannot be satisfied simultaneously.\n"
+                f"   This may be due to conflicting tag constraints or insufficient available cards.\n"
+                f"   Status: {status_name}"
+            )
+        else:
+            raise ValueError(
+                f"Optimization failed with status: {status_name}\n"
+                f"   Please check your configuration and try again."
+            )
     
     return model, x, z, y, vendors, cards, K, unavailable_cards, available_mandatory, available_optional
 

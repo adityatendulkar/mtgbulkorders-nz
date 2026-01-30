@@ -16,6 +16,26 @@ Edit `config.yaml` to set:
 - Shipping costs
 - Vendor penalty
 - Optional cards and minimums
+- Card tags and tag constraints
+
+### Card Tagging (Optional)
+
+You can add tags to cards to control how many of each type are selected:
+
+```yaml
+optional_cards:
+  - Carrion Feeder [black, sacrifice]
+  - Arcbound Mouser [artifact]
+
+tag_constraints:
+  black:
+    minimum: 5    # At least 5 black cards
+    maximum: 10   # At most 10 black cards
+  sacrifice:
+    target: 3     # Exactly 3 sacrifice cards
+```
+
+The optimizer will automatically validate constraints and report errors if they cannot be satisfied.
 
 ## Requirements
 
