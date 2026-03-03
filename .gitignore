@@ -3,3 +3,5 @@ prices/
 __pycache__/
 *.pyc
 venv/
+superset/
+.superset/

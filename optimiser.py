@@ -1,10 +1,43 @@
 """MILP optimisation for card purchases."""
 
 import json
+import os
+import platform
+import shutil
 import pulp
 
 # Constants
 BIG_M = 9999.0  # Price representing unavailable cards
+
+
+def _build_solver_candidates():
+    """Build ordered solver candidates for cross-platform compatibility."""
+    candidates = []
+    seen = set()
+
+    def add_coin_solver(name, path):
+        if not path:
+            return
+        abs_path = os.path.abspath(path)
+        if not (os.path.isfile(abs_path) and os.access(abs_path, os.X_OK)):
+            return
+        key = ("coin_cmd", abs_path)
+        if key in seen:
+            return
+        seen.add(key)
+        candidates.append((name, pulp.COIN_CMD(path=abs_path, msg=False)))
+
+    # Prefer explicitly installed CBC first.
+    add_coin_solver("cbc_on_path", shutil.which("cbc"))
+
+    # Common macOS locations (useful when PATH differs between shells/apps).
+    if platform.system().lower() == "darwin":
+        add_coin_solver("cbc_homebrew_opt", "/opt/homebrew/bin/cbc")
+        add_coin_solver("cbc_homebrew_usr_local", "/usr/local/bin/cbc")
+
+    # Fallback to PuLP bundled CBC (typically works on Windows and Intel macOS).
+    candidates.append(("pulp_bundled_cbc", pulp.PULP_CBC_CMD(msg=False)))
+    return candidates
 
 
 def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, available_optional):
@@ -267,7 +300,27 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
     
     # Solve
     print("\nSolving optimisation problem...")
-    model.solve()
+    solver_candidates = _build_solver_candidates()
+    solve_errors = []
+    solved = False
+    for solver_name, solver in solver_candidates:
+        try:
+            model.solve(solver)
+            solved = True
+            break
+        except (OSError, pulp.PulpSolverError) as e:
+            solve_errors.append(f"{solver_name}: {e}")
+
+    if not solved:
+        attempted = ", ".join(name for name, _ in solver_candidates)
+        details = "\n   - ".join(solve_errors) if solve_errors else "No solver candidates were available."
+        raise ValueError(
+            "No compatible MILP solver could be executed.\n"
+            f"   Attempted: {attempted if attempted else 'none'}\n"
+            f"   - {details}\n"
+            "   On Apple Silicon macOS, install native CBC with `brew install cbc`.\n"
+            "   On Windows, the bundled PuLP CBC solver should work in a standard 64-bit Python environment."
+        )
     
     # Check if solution is feasible
     if model.status != pulp.LpStatusOptimal:

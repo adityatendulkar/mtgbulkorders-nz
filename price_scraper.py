@@ -36,7 +36,8 @@ def scrape_prices(cards, vendors, optional_cards=None):
             "User-Agent": user_agents[idx % len(user_agents)],
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-NZ,en-US;q=0.9,en;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
+            # Avoid brotli here; environments without brotli support will fail JSON parsing.
+            "Accept-Encoding": "gzip, deflate",
             "Referer": "https://mtgsingles.co.nz/",
             "Origin": "https://mtgsingles.co.nz",
             "DNT": "1",
@@ -70,6 +71,14 @@ def scrape_prices(cards, vendors, optional_cards=None):
                         time.sleep(0.5)
                         continue
                     print(f" - Empty response")
+                    break
+
+                content_type = r.headers.get("Content-Type", "").lower()
+                if "application/json" not in content_type:
+                    if attempt < max_attempts - 1:
+                        time.sleep(0.5)
+                        continue
+                    print(f" - Unexpected content type: {content_type or 'unknown'}")
                     break
                 
                 try:
