@@ -89,8 +89,7 @@ vendor_discounts:
   #beadnd: 0.75  # 25% discount
 
 # MANDATORY cards to purchase (must buy all available)
-cards:
-  - Ash Barrens
+cards: []
   # # Temple cycle
   # - Temple of Enlightenment
   # - Temple of Deceit
@@ -131,8 +130,7 @@ cards:
 # OPTIONAL cards (optimizer will select the most cost-effective ones)
 # You can add tags to cards using square brackets: Card Name [tag1, tag2]
 # Then use tag_constraints below to control how many cards with each tag are selected
-optional_cards:
-  - Arcbound Mouser
+optional_cards: []
   # Example with tags:
   # - Carrion Feeder [black, sacrifice]
   # - Bloodsoaked Champion [black, aggressive]

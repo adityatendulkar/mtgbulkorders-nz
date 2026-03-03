@@ -1,10 +1,10 @@
 Status: Optimal
 
 Use vendor: otakumart (shipping: $0.00)
-  Buy ash barrens at $0.25
-  Subtotal for otakumart: $0.25
+  Buy ash barrens at $0.30
+  Subtotal for otakumart: $0.30
 
-Total cost (including shipping): $0.25
+Total cost (including shipping): $0.30
 Cards purchased: 1 mandatory, 0 optional
 
 ============================================================

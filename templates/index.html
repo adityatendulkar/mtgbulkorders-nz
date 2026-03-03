@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Card Optimiser</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>MTG NZ Bulk Order Optimiser</h1>
+    </header>
+
+    <section class="panel closeable" data-panel="cities">
+      <div class="panel-header">
+        <h2>Pickup Cities</h2>
+        <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+      </div>
+      <div class="panel-body">
+        <div id="cityChips" class="chip-grid"></div>
+      </div>
+    </section>
+
+    <section class="panel closeable" data-panel="stores">
+      <div class="panel-header">
+        <h2>Stores</h2>
+        <div class="row-actions">
+          <button id="selectAllStores" class="ghost" type="button">Select all</button>
+          <button id="clearAllStores" class="ghost" type="button">Clear</button>
+          <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="storeGrid" class="store-grid"></div>
+      </div>
+    </section>
+
+    <section class="panel closeable" data-panel="card-builder">
+      <div class="panel-header">
+        <h2>Card Builder</h2>
+        <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+      </div>
+      <div class="panel-body">
+      <div class="builder-grid">
+        <label class="field card-name-field">
+          <span>Card Name</span>
+          <div class="card-name-autocomplete">
+            <input id="cardNameInput" type="text" placeholder="e.g. Carrion Feeder" autocomplete="off">
+            <div id="cardNameSuggestions" class="card-name-suggestions" role="listbox" aria-hidden="true"></div>
+          </div>
+        </label>
+        <div class="add-card-buttons">
+          <button id="addCardMandatory" type="button" class="primary">Add Card (Mandatory)</button>
+          <button id="addCardOptional" type="button" class="ghost">Add Card (Optional)</button>
+        </div>
+      </div>
+      <p id="cardBuilderError" class="card-builder-error" aria-live="polite"></p>
+      <div class="tag-composer">
+        <div class="panel-header tight">
+          <h3>Tag Picker</h3>
+        </div>
+        <div id="tagPalette" class="chip-grid"></div>
+        <div class="tag-add-row">
+          <input id="newTagInput" type="text" placeholder="Create a new tag">
+          <button id="addTagBtn" class="ghost" type="button">Add Tag</button>
+        </div>
+        <p class="hint">Click tags to attach them to the card in the builder.</p>
+      </div>
+      <div class="bulk-input-row">
+        <input id="bulkFileInput" type="file" accept=".txt,text/plain" class="hidden" aria-label="Bulk import from file">
+        <button id="bulkInputBtn" type="button" class="ghost">Bulk input (TXT)</button>
+      </div>
+      </div>
+    </section>
+
+    <section class="panel two-col closeable" data-panel="card-lists">
+      <div class="panel-header">
+        <h2>Cards</h2>
+        <div class="row-actions">
+          <button id="clearAllCards" class="ghost" type="button">Clear all cards</button>
+          <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+        </div>
+      </div>
+      <div class="panel-body">
+      <div>
+        <div class="panel-header tight">
+          <h3>Mandatory Cards</h3>
+          <span id="mandatoryCount" class="counter">0</span>
+        </div>
+        <div id="mandatoryList" class="card-list"></div>
+      </div>
+      <div>
+        <div class="panel-header tight">
+          <h3>Optional Cards</h3>
+          <span id="optionalCount" class="counter">0</span>
+        </div>
+        <div id="optionalList" class="card-list"></div>
+      </div>
+      </div>
+    </section>
+
+    <section class="panel closeable" data-panel="tag-constraints">
+      <div class="panel-header">
+        <h2>Tag Constraints</h2>
+        <div class="row-actions">
+          <button id="addConstraintBtn" class="ghost" type="button">Add Constraint</button>
+          <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="constraintRows" class="constraint-list"></div>
+        <datalist id="allTags"></datalist>
+        <p class="hint">Use `target` for exact counts. If `target` is set, min/max are ignored.</p>
+      </div>
+    </section>
+
+    <section class="panel closeable" data-panel="run-settings">
+      <div class="panel-header">
+        <h2>Run Settings</h2>
+        <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+      </div>
+      <div class="panel-body">
+        <label class="field">
+          <span>Vendor Penalty (NZD)</span>
+          <input id="vendorPenalty" type="number" step="0.01" min="0">
+        </label>
+        <label class="field">
+          <span>Minimum Optional Cards</span>
+          <input id="minOptionalCards" type="number" step="1" min="0">
+        </label>
+      </div>
+    </section>
+
+    <section class="actions">
+      <button id="runBtn" class="primary large" type="button">Run Optimiser</button>
+      <div id="scrapeProgressWrap" class="scrape-progress-wrap hidden">
+        <div class="scrape-progress-head">
+          <span id="scrapeProgressLabel">Scraping prices…</span>
+          <span id="scrapeProgressCount">0 / 0</span>
+        </div>
+        <div class="scrape-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+          <div id="scrapeProgressFill" class="scrape-progress-fill"></div>
+        </div>
+      </div>
+      <p id="runStatus" class="status"></p>
+    </section>
+
+    <section id="resultPanel" class="panel closeable hidden" data-panel="results">
+      <div class="panel-header">
+        <h2>Results</h2>
+        <button type="button" class="panel-toggle" aria-label="Hide panel"><span class="panel-toggle-icon">▼</span></button>
+      </div>
+      <div class="panel-body">
+        <div id="resultBody"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <a href="https://github.com/adityatendulkar/mtgbulkorders-nz" target="_blank" rel="noopener noreferrer" class="footer-github" aria-label="View on GitHub">
+      <svg class="github-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
+        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+      </svg>
+    </a>
+    <span class="footer-caption">Thanks to <a href="https://mtgsingles.co.nz" target="_blank" rel="noopener noreferrer">mtgsingles.co.nz</a> for their API!</span>
+  </footer>
+
+  <script>
+    window.__INITIAL_DATA__ = {{ initial_data|tojson }};
+  </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

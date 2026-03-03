@@ -8,6 +8,21 @@ Optimises bulk purchases from the website mtgsingles.co.nz, allowing you to make
 2. Run `python run_optimiser.py`
 3. View results in the `results/` folder
 
+## Flask GUI
+
+You can also run a browser GUI:
+
+1. Install Flask (if not already installed): `pip install flask`
+2. Start the app: `python app.py`
+3. Open `http://127.0.0.1:5000`
+
+The GUI lets you choose:
+- Pickup cities
+- Stores/vendors
+- Mandatory and optional cards
+- Card tags (chip-based selector)
+- Tag constraints
+
 ## Configuration
 
 Edit `config.yaml` to set:

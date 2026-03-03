@@ -8,19 +8,34 @@ import json
 BIG_M = 9999.0  # Price representing unavailable cards
 
 
-def scrape_prices(cards, vendors, optional_cards=None):
-    """Scrape prices from MTG Singles API."""
+def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
+    """Scrape prices from MTG Singles API. progress_callback(current, total, card_name) is called per card."""
     if optional_cards is None:
         optional_cards = []
     
     url = "https://api.mtgsingles.co.nz/MtgSingle"
     
     all_cards = list(cards) + list(optional_cards)
-    K = {}
-    print(f"Scraping prices for {len(all_cards)} cards ({len(cards)} mandatory, {len(optional_cards)} optional)...")
+    # Deduplicate by name (case-insensitive) so we only scrape each name once
+    seen = set()
+    unique_cards_ordered = []
+    for c in all_cards:
+        key = c.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique_cards_ordered.append(key)
+    total_unique = len(unique_cards_ordered)
+    total = len(all_cards)
+    if total_unique < total:
+        print(f"Scraping prices for {total_unique} unique cards (from {total} entries)...")
+    else:
+        print(f"Scraping prices for {total} cards ({len(cards)} mandatory, {len(optional_cards)} optional)...")
     
-    for idx, card in enumerate(all_cards, 1):
-        print(f"  [{idx}/{len(all_cards)}] Scraping: {card}", end="")
+    K = {}
+    for idx, card in enumerate(unique_cards_ordered, 1):
+        if progress_callback:
+            progress_callback(idx, total_unique, card)
+        print(f"  [{idx}/{total_unique}] Scraping: {card}", end="")
         
         # Create fresh session for each request to avoid connection issues
         session = requests.Session()
@@ -123,7 +138,7 @@ def scrape_prices(cards, vendors, optional_cards=None):
                 session.close()
         
         # Longer delay between cards to be more gentle
-        if idx < len(all_cards):
+        if idx < total_unique:
             time.sleep(1 + (idx % 3))  # 1-3 second delay
     
     # Build structured data for MILP
