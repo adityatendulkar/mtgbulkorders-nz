@@ -1,14 +1,15 @@
 Status: Optimal
 
-Use vendor: otakumart (shipping: $0.00)
-  Buy ash barrens at $0.30
-  Subtotal for otakumart: $0.30
+Use vendor: hobbymaster (shipping: $2.00)
+  Buy rune-scarred demon at $1.90
+  Buy woodland cemetery at $1.00
+  Subtotal for hobbymaster: $4.90
 
-Total cost (including shipping): $0.30
-Cards purchased: 1 mandatory, 0 optional
+Use vendor: calicokeep (shipping: $6.00)
+  Buy darkbore pathway // slitherbore pathway at $7.90
+  Buy blooming marsh at $2.80
+  Buy tooth and nail at $3.40
+  Subtotal for calicokeep: $20.10
 
-============================================================
-OPTIONAL CARDS NOT PURCHASED (1):
-The following optional cards were available but not selected by the optimiser:
-
-  - arcbound mouser
+Total cost (including shipping): $25.00
+Cards purchased: 5 mandatory, 0 optional

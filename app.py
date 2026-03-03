@@ -50,8 +50,36 @@ def _load_card_names():
     return data
 
 
+# Unicode dash/minus variants to normalise to ASCII hyphen (incl. en dash U+2013, em dash U+2014)
+_UNICODE_DASHES = (
+    "\u00AD",  # soft hyphen
+    "\u2010",  # hyphen
+    "\u2011",  # non-breaking hyphen
+    "\u2012",  # figure dash
+    "\u2013",  # en dash
+    "\u2014",  # em dash
+    "\u2015",  # horizontal bar
+    "\u2212",  # minus sign
+    "\u2796",  # heavy minus
+    "\u2E3A",  # two-em dash
+    "\u2E3B",  # three-em dash
+    "\uFE58",  # small em dash
+    "\uFE63",  # small hyphen-minus
+    "\uFF0D",  # fullwidth hyphen-minus
+)
+
+
+def _normalise_dashes(s):
+    """Replace Unicode dash/minus variants (en dash, em dash, etc.) with ASCII hyphen so card names match."""
+    if not s:
+        return s
+    for char in _UNICODE_DASHES:
+        s = s.replace(char, "-")
+    return s
+
+
 def _clean_tag(tag):
-    return str(tag).strip().lower()
+    return _normalise_dashes(str(tag).strip().lower())
 
 
 def _clean_name(name):
@@ -162,7 +190,7 @@ def _build_card_tag_map(mandatory_cards, optional_cards):
     card_tags = {}
     for card in mandatory_cards + optional_cards:
         if card["tags"]:
-            card_tags[card["name"].lower()] = card["tags"]
+            card_tags[_clean_tag(card["name"])] = card["tags"]
     return card_tags
 
 
@@ -412,6 +440,9 @@ def optimise():
     mandatory_names = [card["name"] for card in mandatory_cards]
     optional_names = [card["name"] for card in optional_cards]
     all_card_names = mandatory_names + optional_names
+    # Normalise names (en/em dash etc. → hyphen) so they match price matrix keys and optimiser
+    mandatory_names_canonical = [_clean_tag(n) for n in mandatory_names]
+    optional_names_canonical = [_clean_tag(n) for n in optional_names]
 
     use_saved_prices = bool(payload.get("use_saved_prices", False))
     price_data_file = (base_config.get("price_data_file") or "").strip()
@@ -462,8 +493,8 @@ def optimise():
             shipping_costs,
             vendor_penalty,
             vendor_discounts,
-            mandatory_names,
-            optional_names,
+            mandatory_names_canonical,
+            optional_names_canonical,
             min_optional_cards,
             selected_cities,
             card_tags,

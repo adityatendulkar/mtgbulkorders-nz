@@ -223,6 +223,28 @@
     return [...byName.values()];
   }
 
+  /** Set how many copies of a card are in the list (add or remove entries). */
+  function setCardCount(list, cardName, newCount) {
+    const key = String(cardName || "").trim().toLowerCase();
+    const indices = [];
+    list.forEach((card, i) => {
+      if (String(card.name || "").trim().toLowerCase() === key) indices.push(i);
+    });
+    const current = indices.length;
+    if (newCount === current) return;
+    if (newCount < 1) return;
+    if (newCount > current) {
+      const template = list[indices[0]];
+      for (let i = current; i < newCount; i++) {
+        list.push({ name: template.name, tags: [...(template.tags || [])] });
+      }
+    } else {
+      for (let i = 0; i < current - newCount; i++) {
+        list.splice(indices[current - 1 - i], 1);
+      }
+    }
+  }
+
   function renderCardList(kind) {
     const list = kind === "mandatory" ? state.mandatoryCards : state.optionalCards;
     const container = kind === "mandatory" ? els.mandatoryList : els.optionalList;
@@ -250,7 +272,53 @@
 
       const name = document.createElement("div");
       name.className = "card-name";
-      name.textContent = group.count > 1 ? `${group.name} × ${group.count}` : group.name;
+      name.textContent = group.name;
+
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+
+      const countWrap = document.createElement("div");
+      countWrap.className = "card-count-wrap";
+      const btnMinus = document.createElement("button");
+      btnMinus.type = "button";
+      btnMinus.className = "card-count-btn";
+      btnMinus.textContent = "−";
+      btnMinus.setAttribute("aria-label", "Decrease quantity");
+      const countInput = document.createElement("input");
+      countInput.type = "number";
+      countInput.min = 1;
+      countInput.step = 1;
+      countInput.value = group.count;
+      countInput.className = "card-count-input";
+      countInput.setAttribute("aria-label", `Quantity for ${group.name}`);
+      const btnPlus = document.createElement("button");
+      btnPlus.type = "button";
+      btnPlus.className = "card-count-btn";
+      btnPlus.textContent = "+";
+      btnPlus.setAttribute("aria-label", "Increase quantity");
+
+      function applyCount(n) {
+        const val = Number.isFinite(n) && n >= 1 ? n : 1;
+        countInput.value = val;
+        setCardCount(list, group.name, val);
+        renderCards();
+      }
+      btnMinus.addEventListener("click", (e) => {
+        e.stopPropagation();
+        applyCount(group.count - 1);
+      });
+      btnPlus.addEventListener("click", (e) => {
+        e.stopPropagation();
+        applyCount(group.count + 1);
+      });
+      countInput.addEventListener("change", () => {
+        const raw = parseInt(countInput.value, 10);
+        applyCount(raw);
+      });
+      countWrap.addEventListener("click", (e) => e.stopPropagation());
+      countWrap.appendChild(btnMinus);
+      countWrap.appendChild(countInput);
+      countWrap.appendChild(btnPlus);
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -263,8 +331,10 @@
         renderCards();
       });
 
+      actions.appendChild(countWrap);
+      actions.appendChild(remove);
       top.appendChild(name);
-      top.appendChild(remove);
+      top.appendChild(actions);
       cardItem.appendChild(top);
 
       const tagList = [...group.tags].filter(Boolean);
@@ -281,13 +351,14 @@
       }
 
       cardItem.addEventListener("click", (e) => {
-        if (e.target.closest(".remove-btn")) return;
+        if (e.target.closest(".remove-btn") || e.target.closest(".card-count-wrap")) return;
         const otherKind = kind === "mandatory" ? "optional" : "mandatory";
         const idx = findFirstIndexByName(list, group.name);
         if (idx !== -1) moveCardBetweenLists(kind, idx, otherKind);
       });
 
       cardItem.addEventListener("dragstart", (e) => {
+        if (e.target.closest(".card-count-wrap")) return;
         const idx = findFirstIndexByName(list, group.name);
         if (idx === -1) return;
         e.dataTransfer.effectAllowed = "move";
@@ -756,18 +827,42 @@
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let currentEvent = null;
+      let currentData = null;
+
+      function tryParseAndHandle() {
+        if (currentEvent == null || currentData == null) return false;
+        try {
+          const data = JSON.parse(currentData);
+          if (currentEvent === "progress") {
+            onProgress(data.current, data.total, data.card);
+          } else if (currentEvent === "complete") {
+            resolve(data.price_data);
+            return true;
+          } else if (currentEvent === "error") {
+            reject(new Error(data.error || "Scrape failed"));
+            return true;
+          }
+        } catch (_) {
+          return false;
+        }
+        return false;
+      }
 
       function processChunk() {
         reader.read().then(({ done, value }) => {
           if (done) {
+            if (currentData !== null && tryParseAndHandle()) return;
             if (buffer.trim()) {
               try {
-                const idx = buffer.indexOf("data:");
-                const dataStr = idx >= 0 ? buffer.slice(idx + 5).trim() : buffer.trim();
-                const data = JSON.parse(dataStr);
-                if (data.price_data) {
-                  resolve(data.price_data);
-                  return;
+                const idx = buffer.lastIndexOf("data:");
+                if (idx >= 0) {
+                  const dataStr = buffer.slice(idx + 5).trim();
+                  const data = JSON.parse(dataStr);
+                  if (data.price_data) {
+                    resolve(data.price_data);
+                    return;
+                  }
                 }
               } catch (_) {}
             }
@@ -777,28 +872,20 @@
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
-          let currentEvent = null;
-          let currentData = null;
           for (const line of lines) {
             if (line.startsWith("event: ")) {
               currentEvent = line.slice(7).trim();
+              currentData = null;
             } else if (line.startsWith("data: ")) {
               currentData = line.slice(6);
+              if (tryParseAndHandle()) return;
             } else if (line === "" && currentEvent && currentData !== null) {
-              try {
-                const data = JSON.parse(currentData);
-                if (currentEvent === "progress") {
-                  onProgress(data.current, data.total, data.card);
-                } else if (currentEvent === "complete") {
-                  resolve(data.price_data);
-                  return;
-                } else if (currentEvent === "error") {
-                  reject(new Error(data.error || "Scrape failed"));
-                  return;
-                }
-              } catch (_) {}
+              if (tryParseAndHandle()) return;
               currentEvent = null;
               currentData = null;
+            } else if (currentData !== null && line !== "") {
+              currentData += line;
+              if (tryParseAndHandle()) return;
             }
           }
           processChunk();

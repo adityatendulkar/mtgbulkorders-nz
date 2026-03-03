@@ -8,6 +8,23 @@ import json
 BIG_M = 9999.0  # Price representing unavailable cards
 
 
+# Unicode dash/minus variants to normalise to ASCII hyphen (en dash U+2013, em dash U+2014, etc.)
+_UNICODE_DASHES = (
+    "\u00AD", "\u2010", "\u2011", "\u2012", "\u2013", "\u2014", "\u2015",
+    "\u2212", "\u2796", "\u2E3A", "\u2E3B", "\uFE58", "\uFE63", "\uFF0D",
+)
+
+
+def _normalise_card_name(name):
+    """Canonical form for matching: strip, lower, and normalise Unicode dashes (en/em dash, etc.) to ASCII hyphen."""
+    if not name:
+        return name
+    s = str(name).strip().lower()
+    for char in _UNICODE_DASHES:
+        s = s.replace(char, "-")
+    return s
+
+
 def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
     """Scrape prices from MTG Singles API. progress_callback(current, total, card_name) is called per card."""
     if optional_cards is None:
@@ -16,11 +33,11 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
     url = "https://api.mtgsingles.co.nz/MtgSingle"
     
     all_cards = list(cards) + list(optional_cards)
-    # Deduplicate by name (case-insensitive) so we only scrape each name once
+    # Deduplicate by name (case-insensitive, dash-normalised) so we only scrape each name once
     seen = set()
     unique_cards_ordered = []
     for c in all_cards:
-        key = c.strip().lower()
+        key = _normalise_card_name(c)
         if key and key not in seen:
             seen.add(key)
             unique_cards_ordered.append(key)
@@ -116,7 +133,7 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
                     
                     price = float(listing["price"].replace("$", "").replace(",", ""))
                     vendor = listing["store"].replace("NZ/", "").lower()
-                    card_name = card.lower()
+                    card_name = _normalise_card_name(card)
                     
                     key = (card_name, vendor)
                     
@@ -141,12 +158,11 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
         if idx < total_unique:
             time.sleep(1 + (idx % 3))  # 1-3 second delay
     
-    # Build structured data for MILP
-    # Use all_cards instead of just cards_set to ensure cards with no data are included
-    all_cards_lower = [card.lower() for card in all_cards]
+    # Build structured data for MILP (canonical card names so they match app.py _clean_tag)
+    all_cards_canonical = [_normalise_card_name(c) for c in all_cards]
     
     K_temp = []
-    for card in sorted(all_cards_lower):
+    for card in sorted(all_cards_canonical):
         for vendor in vendors:
             price = K.get((card, vendor), BIG_M)
             K_temp.append({
