@@ -4,6 +4,7 @@ import json
 import os
 import platform
 import shutil
+from collections import Counter
 import pulp
 
 # Constants
@@ -40,14 +41,25 @@ def _build_solver_candidates():
     return candidates
 
 
-def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, available_optional):
+def _format_card_count_list(card_counts):
+    """Return card labels like 'name x3' for diagnostics."""
+    labels = []
+    for card, count in sorted(card_counts.items()):
+        if count <= 1:
+            labels.append(card)
+        else:
+            labels.append(f"{card} x{count}")
+    return labels
+
+
+def validate_tag_constraints(tag_constraints, card_tags, mandatory_qty, optional_qty):
     """Validate that tag constraints can be satisfied with available cards.
     
     Args:
         tag_constraints: Dictionary mapping tag -> {minimum, maximum, target}
         card_tags: Dictionary mapping card_name (lowercase) -> list of tags
-        available_mandatory: List of available mandatory cards
-        available_optional: List of available optional cards
+        mandatory_qty: Dict mapping mandatory card_name -> required quantity
+        optional_qty: Dict mapping optional card_name -> max selectable quantity
         
     Raises:
         ValueError: If constraints cannot be satisfied
@@ -55,12 +67,20 @@ def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, av
     errors = []
     
     for tag, constraints in tag_constraints.items():
-        # Count mandatory and optional cards with this tag
-        mandatory_with_tag = [c for c in available_mandatory if tag in card_tags.get(c.lower(), [])]
-        optional_with_tag = [c for c in available_optional if tag in card_tags.get(c.lower(), [])]
-        
-        mandatory_count = len(mandatory_with_tag)
-        total_available = mandatory_count + len(optional_with_tag)
+        mandatory_with_tag = {
+            card: qty
+            for card, qty in mandatory_qty.items()
+            if tag in card_tags.get(card.lower(), [])
+        }
+        optional_with_tag = {
+            card: qty
+            for card, qty in optional_qty.items()
+            if tag in card_tags.get(card.lower(), [])
+        }
+
+        mandatory_count = sum(mandatory_with_tag.values())
+        optional_count = sum(optional_with_tag.values())
+        total_available = mandatory_count + optional_count
         
         # Check target constraint
         if 'target' in constraints:
@@ -68,13 +88,14 @@ def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, av
             if mandatory_count > target:
                 errors.append(
                     f"Tag '{tag}': Cannot satisfy target={target}. "
-                    f"Already have {mandatory_count} mandatory cards with this tag: {', '.join(mandatory_with_tag)}"
+                    f"Already have {mandatory_count} mandatory cards with this tag: "
+                    f"{', '.join(_format_card_count_list(mandatory_with_tag)) or 'none'}"
                 )
             elif total_available < target:
                 errors.append(
                     f"Tag '{tag}': Cannot satisfy target={target}. "
                     f"Only {total_available} cards available with this tag "
-                    f"({mandatory_count} mandatory + {len(optional_with_tag)} optional)"
+                    f"({mandatory_count} mandatory + {optional_count} optional)"
                 )
         
         # Check minimum constraint
@@ -84,7 +105,7 @@ def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, av
                 errors.append(
                     f"Tag '{tag}': Cannot satisfy minimum={minimum}. "
                     f"Only {total_available} cards available with this tag "
-                    f"({mandatory_count} mandatory + {len(optional_with_tag)} optional)"
+                    f"({mandatory_count} mandatory + {optional_count} optional)"
                 )
         
         # Check maximum constraint
@@ -93,7 +114,8 @@ def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, av
             if mandatory_count > maximum:
                 errors.append(
                     f"Tag '{tag}': Cannot satisfy maximum={maximum}. "
-                    f"Already have {mandatory_count} mandatory cards with this tag: {', '.join(mandatory_with_tag)}"
+                    f"Already have {mandatory_count} mandatory cards with this tag: "
+                    f"{', '.join(_format_card_count_list(mandatory_with_tag)) or 'none'}"
                 )
         
         # Check if minimum and maximum are compatible
@@ -110,29 +132,31 @@ def validate_tag_constraints(tag_constraints, card_tags, available_mandatory, av
     print("Tag constraints validated successfully")
 
 
-def add_tag_constraints(model, tag_constraints, card_tags, available_mandatory, available_optional, z, y, vendors):
+def add_tag_constraints(model, tag_constraints, card_tags, mandatory_qty, optional_qty, y):
     """Add tag constraints to the optimization model.
     
     Args:
         model: PuLP model to add constraints to
         tag_constraints: Dictionary mapping tag -> {minimum, maximum, target}
         card_tags: Dictionary mapping card_name (lowercase) -> list of tags
-        available_mandatory: List of available mandatory cards
-        available_optional: List of available optional cards
-        z: Decision variables for card-vendor purchases
-        y: Decision variables for optional card selection
-        vendors: Set of vendors
+        mandatory_qty: Dict mapping mandatory card_name -> required quantity
+        optional_qty: Dict mapping optional card_name -> max selectable quantity
+        y: Decision variables for optional card selection quantities
     """
     for tag, constraints in tag_constraints.items():
-        # Find mandatory and optional cards with this tag
-        mandatory_with_tag = [c for c in available_mandatory if tag in card_tags.get(c.lower(), [])]
-        optional_with_tag = [c for c in available_optional if tag in card_tags.get(c.lower(), [])]
+        mandatory_count = sum(
+            qty for card, qty in mandatory_qty.items()
+            if tag in card_tags.get(card.lower(), [])
+        )
+        optional_with_tag = [
+            card for card in optional_qty
+            if tag in card_tags.get(card.lower(), [])
+        ]
         
         # Build expression for total cards with this tag
-        # Mandatory cards are always purchased (sum over vendors = 1)
-        # Optional cards depend on y[c]
+        # Mandatory quantities are fixed; optional quantities depend on y[c]
         tag_total = (
-            len(mandatory_with_tag) +  # Mandatory cards always count
+            mandatory_count +
             pulp.lpSum(y[c] for c in optional_with_tag)  # Optional cards only count if selected
         )
         
@@ -178,6 +202,8 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         mandatory_cards = []
     if optional_cards is None:
         optional_cards = []
+    if cities_im_in is None:
+        cities_im_in = []
     if card_tags is None:
         card_tags = {}
     if tag_constraints is None:
@@ -188,12 +214,18 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         else:
             shipping_costs[vendor] = shipping_costs[vendor][0]  # Use the first element (shipping cost)
 
-    # Convert to lowercase for matching
-    mandatory_cards_lower = set(c.lower() for c in mandatory_cards)
-    optional_cards_lower = set(c.lower() for c in optional_cards)
+    # Convert to lowercase and preserve quantity demands
+    mandatory_requested = Counter(c.lower() for c in mandatory_cards if c)
+    optional_requested = Counter(c.lower() for c in optional_cards if c)
+    overlap = sorted(set(mandatory_requested) & set(optional_requested))
+    if overlap:
+        raise ValueError(
+            "Cards cannot be in both mandatory and optional lists at the same time.\n"
+            f"   Overlapping card(s): {', '.join(overlap)}"
+        )
     
     vendors = set(item["vendor"] for item in K_json)
-    all_cards = set(item["card"] for item in K_json)
+    demand_cards = set(mandatory_requested) | set(optional_requested)
     
     K = {
         (item["vendor"], item["card"]): item["price"] for item in K_json
@@ -206,48 +238,59 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
             K[key] *= vendor_discounts[vendor]
     
     # Identify unavailable cards (all prices are BIG_M)
-    unavailable_mandatory = []
-    unavailable_optional = []
-    available_mandatory = []
-    available_optional = []
-    
-    for card in all_cards:
+    unavailable_mandatory = {}
+    unavailable_optional = {}
+    available_mandatory_qty = {}
+    available_optional_qty = {}
+
+    for card in sorted(demand_cards):
         min_price = min(K.get((v, card), BIG_M) for v in vendors)
-        is_mandatory = card in mandatory_cards_lower
-        is_optional = card in optional_cards_lower
-        
+        mandatory_qty = mandatory_requested.get(card, 0)
+        optional_qty = optional_requested.get(card, 0)
+
         if min_price >= BIG_M:
-            if is_mandatory:
-                unavailable_mandatory.append(card)
-            elif is_optional:
-                unavailable_optional.append(card)
+            if mandatory_qty > 0:
+                unavailable_mandatory[card] = mandatory_qty
+            if optional_qty > 0:
+                unavailable_optional[card] = optional_qty
         else:
-            if is_mandatory:
-                available_mandatory.append(card)
-            elif is_optional:
-                available_optional.append(card)
-    
-    # List of all cards to consider in optimisation
-    cards = set(available_mandatory + available_optional)
-    unavailable_cards = unavailable_mandatory + unavailable_optional
+            if mandatory_qty > 0:
+                available_mandatory_qty[card] = mandatory_qty
+            if optional_qty > 0:
+                available_optional_qty[card] = optional_qty
+
+    cards = set(available_mandatory_qty) | set(available_optional_qty)
+    unavailable_cards = {**unavailable_mandatory, **unavailable_optional}
     
     if unavailable_mandatory:
-        print(f"\n   WARNING: {len(unavailable_mandatory)} MANDATORY card(s) not available:")
-        for card in sorted(unavailable_mandatory):
+        unavailable_qty = sum(unavailable_mandatory.values())
+        print(f"\n   WARNING: {unavailable_qty} MANDATORY card copy/copies not available:")
+        for card in _format_card_count_list(unavailable_mandatory):
             print(f"     - {card}")
     
     if unavailable_optional:
-        print(f"\n   Note: {len(unavailable_optional)} optional card(s) not available:")
-        for card in sorted(unavailable_optional):
+        unavailable_qty = sum(unavailable_optional.values())
+        print(f"\n   Note: {unavailable_qty} optional card copy/copies not available:")
+        for card in _format_card_count_list(unavailable_optional):
             print(f"     - {card}")
     
     if unavailable_mandatory or unavailable_optional:
-        print(f"\n   Optimising for {len(available_mandatory)} mandatory + {len(available_optional)} optional cards...\n")
+        available_mandatory_total = sum(available_mandatory_qty.values())
+        available_optional_total = sum(available_optional_qty.values())
+        print(
+            f"\n   Optimising for {available_mandatory_total} mandatory + "
+            f"{available_optional_total} optional card copy/copies...\n"
+        )
     
     # Validate tag constraints against available cards
     if tag_constraints:
         print("\n   Validating tag constraints...")
-        validate_tag_constraints(tag_constraints, card_tags, available_mandatory, available_optional)
+        validate_tag_constraints(
+            tag_constraints,
+            card_tags,
+            available_mandatory_qty,
+            available_optional_qty,
+        )
     
     # Create problem
     model = pulp.LpProblem("MTG_Min_Cost", pulp.LpMinimize)
@@ -255,7 +298,8 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
     # Decision variables
     z = pulp.LpVariable.dicts(
         "z", [(v, c) for v in vendors for c in cards],
-        cat="Binary"
+        lowBound=0,
+        cat="Integer"
     )
     
     x = pulp.LpVariable.dicts(
@@ -263,10 +307,11 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         cat="Binary"
     )
     
-    # Decision variable for whether an optional card is purchased
+    # Decision variable for optional quantity selected per card
     y = pulp.LpVariable.dicts(
-        "y", available_optional,
-        cat="Binary"
+        "y", list(available_optional_qty),
+        lowBound=0,
+        cat="Integer"
     )
     
     # Objective function
@@ -276,27 +321,37 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
         + vendor_penalty * pulp.lpSum(x[v] for v in vendors)
     )
     
-    # Constraints: Each mandatory card bought exactly once
-    for c in available_mandatory:
-        model += pulp.lpSum(z[v, c] for v in vendors) == 1
-    
-    # Constraints: Each optional card bought at most once (only if y[c] = 1)
-    for c in available_optional:
+    # Constraints: Each mandatory card bought for its required quantity
+    for c, qty in available_mandatory_qty.items():
+        model += pulp.lpSum(z[v, c] for v in vendors) == qty
+
+    # Constraints: Optional card quantity is chosen up to configured quantity
+    for c, qty in available_optional_qty.items():
         model += pulp.lpSum(z[v, c] for v in vendors) == y[c]
+        model += y[c] <= qty
     
     # Constraint: Minimum number of optional cards must be purchased
-    if available_optional and min_optional_cards > 0:
-        actual_min = min(min_optional_cards, len(available_optional))
-        model += pulp.lpSum(y[c] for c in available_optional) >= actual_min
+    if available_optional_qty and min_optional_cards > 0:
+        max_optional_available = sum(available_optional_qty.values())
+        actual_min = min(min_optional_cards, max_optional_available)
+        model += pulp.lpSum(y[c] for c in available_optional_qty) >= actual_min
     
     # Tag constraints
     if tag_constraints:
-        add_tag_constraints(model, tag_constraints, card_tags, available_mandatory, available_optional, z, y, vendors)
+        add_tag_constraints(
+            model,
+            tag_constraints,
+            card_tags,
+            available_mandatory_qty,
+            available_optional_qty,
+            y,
+        )
     
     # Linking constraint: can only buy from vendor if we use that vendor
     for v in vendors:
         for c in cards:
-            model += z[v, c] <= x[v]
+            max_qty_for_card = available_mandatory_qty.get(c, 0) + available_optional_qty.get(c, 0)
+            model += z[v, c] <= max_qty_for_card * x[v]
     
     # Solve
     print("\nSolving optimisation problem...")
@@ -337,10 +392,34 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
                 f"   Please check your configuration and try again."
             )
     
-    return model, x, z, y, vendors, cards, K, unavailable_cards, available_mandatory, available_optional
+    return (
+        model,
+        x,
+        z,
+        y,
+        vendors,
+        cards,
+        K,
+        unavailable_cards,
+        available_mandatory_qty,
+        available_optional_qty,
+    )
 
 
-def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_cards, available_mandatory, available_optional, output_file="results.txt"):
+def save_results(
+    model,
+    x,
+    z,
+    y,
+    vendors,
+    cards,
+    K,
+    shipping_costs,
+    unavailable_cards,
+    mandatory_card_quantities,
+    optional_card_quantities,
+    output_file="results.txt",
+):
     """Save optimisation results to file."""
     total_cost = 0
     mandatory_purchased = 0
@@ -349,8 +428,8 @@ def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_
     with open(output_file, "w") as f:
         f.write(f"Status: {pulp.LpStatus[model.status]}\n\n")
         
-        for v in vendors:
-            purchased_cards = [c for c in cards if z[v, c].value() == 1]
+        for v in sorted(vendors):
+            purchased_cards = [c for c in cards if int(round(z[v, c].value() or 0)) > 0]
 
             if not purchased_cards:
                 continue  # Skip vendor entirely if no cards bought
@@ -359,18 +438,24 @@ def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_
                 vendor_total = shipping_costs.get(v, 0)  # Start with shipping cost
                 f.write(f"Use vendor: {v} (shipping: ${shipping_costs.get(v, 0):.2f})\n")
                 
-                for c in cards:
-                    if z[v, c].value() == 1:
-                        price = K[(v.lower(), c.lower())]
-                        vendor_total += price
-                        is_optional = c in available_optional
+                for c in sorted(cards):
+                    qty = int(round(z[v, c].value() or 0))
+                    if qty > 0:
+                        price = float(K[(v, c)])
+                        line_total = qty * price
+                        vendor_total += line_total
+                        is_optional = c in optional_card_quantities
                         card_type = " [OPTIONAL]" if is_optional else ""
-                        f.write(f"  Buy {c} at ${price:.2f}{card_type}\n")
+                        qty_prefix = f"{qty}x " if qty > 1 else ""
+                        f.write(
+                            f"  Buy {qty_prefix}{c} at ${price:.2f} each "
+                            f"(line total: ${line_total:.2f}){card_type}\n"
+                        )
                         
                         if is_optional:
-                            optional_purchased += 1
+                            optional_purchased += qty
                         else:
-                            mandatory_purchased += 1
+                            mandatory_purchased += qty
                 
                 total_cost += vendor_total
                 f.write(f"  Subtotal for {v}: ${vendor_total:.2f}\n\n")
@@ -378,27 +463,37 @@ def save_results(model, x, z, y, vendors, cards, K, shipping_costs, unavailable_
         f.write(f"Total cost (including shipping): ${total_cost:.2f}\n")
         f.write(f"Cards purchased: {mandatory_purchased} mandatory, {optional_purchased} optional\n")
         
-        # Determine which optional cards were not purchased
-        optional_not_purchased = [c for c in available_optional if y[c].value() == 0]
+        optional_not_purchased = {}
+        for card, requested_qty in optional_card_quantities.items():
+            purchased_qty = int(round(y[card].value() or 0))
+            missing_qty = requested_qty - purchased_qty
+            if missing_qty > 0:
+                optional_not_purchased[card] = missing_qty
         
         if optional_not_purchased:
             f.write(f"\n" + "=" * 60 + "\n")
-            f.write(f"OPTIONAL CARDS NOT PURCHASED ({len(optional_not_purchased)}):")
+            total_missing = sum(optional_not_purchased.values())
+            f.write(f"OPTIONAL CARDS NOT PURCHASED ({total_missing}):")
             f.write(f"\nThe following optional cards were available but not selected by the optimiser:\n\n")
-            for card in sorted(optional_not_purchased):
+            for card in _format_card_count_list(optional_not_purchased):
                 f.write(f"  - {card}\n")
         
         if unavailable_cards:
             f.write(f"\n" + "=" * 60 + "\n")
-            f.write(f"UNAVAILABLE CARDS ({len(unavailable_cards)}):")
+            total_unavailable = sum(unavailable_cards.values())
+            f.write(f"UNAVAILABLE CARDS ({total_unavailable}):")
             f.write(f"\nThe following cards were not available from any vendor:\n\n")
-            for card in sorted(unavailable_cards):
+            for card in _format_card_count_list(unavailable_cards):
                 f.write(f"  - {card}\n")
     
     print(f"\nResults saved to {output_file}")
     print(f"Total cost: ${total_cost:.2f}")
-    print(f"Cards purchased: {mandatory_purchased} mandatory, {optional_purchased}/{len(available_optional)} optional")
+    optional_requested_total = sum(optional_card_quantities.values())
+    print(
+        f"Cards purchased: {mandatory_purchased} mandatory, "
+        f"{optional_purchased}/{optional_requested_total} optional"
+    )
     if optional_not_purchased:
-        print(f"Optional cards not purchased: {len(optional_not_purchased)}")
+        print(f"Optional cards not purchased: {sum(optional_not_purchased.values())}")
     if unavailable_cards:
-        print(f"Unavailable cards: {len(unavailable_cards)}")
+        print(f"Unavailable cards: {sum(unavailable_cards.values())}")

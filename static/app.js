@@ -412,7 +412,9 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.className = "remove-btn";
-      remove.textContent = "Remove";
+      remove.textContent = "×";
+      remove.setAttribute("aria-label", `Remove ${group.name}`);
+      remove.title = "Remove";
       remove.addEventListener("click", (e) => {
         e.stopPropagation();
         const idx = findFirstIndexByName(list, group.name);
@@ -638,7 +640,12 @@
         const cardsHtml = vendorSummary.cards
           .map((card) => {
             const label = card.optional ? " [optional]" : "";
-            return `<li>${escapeHtml(card.name)} - $${card.price.toFixed(2)}${label}</li>`;
+            const quantity = Number(card.quantity || 0);
+            const quantityLabel = quantity > 1 ? ` x${quantity}` : "";
+            return (
+              `<li>${escapeHtml(card.name)}${quantityLabel} - ` +
+              `$${card.price.toFixed(2)} each (Total: $${card.line_total.toFixed(2)})${label}</li>`
+            );
           })
           .join("");
 
@@ -679,6 +686,14 @@
         <div class="metric">
           <div class="label">Total Cost</div>
           <div class="value">$${summary.total_cost.toFixed(2)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Card Cost</div>
+          <div class="value">$${summary.card_cost.toFixed(2)}</div>
+        </div>
+        <div class="metric">
+          <div class="label">Shipping Cost</div>
+          <div class="value">$${summary.shipping_cost.toFixed(2)}</div>
         </div>
         <div class="metric">
           <div class="label">Mandatory Purchased</div>
@@ -805,6 +820,10 @@
       setCardBuilderError("No card lines found. Use format: 4 Card Name or 4 Card Name [Tag 2]", "error");
       return;
     }
+
+    // Bulk import replaces the current working card lists.
+    state.mandatoryCards.length = 0;
+    state.optionalCards.length = 0;
 
     setCardBuilderError(`Validating ${toAdd.length} card(s)…`);
     els.bulkInputBtn.disabled = true;

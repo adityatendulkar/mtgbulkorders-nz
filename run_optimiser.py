@@ -176,7 +176,18 @@ def main():
     print("\n3. Optimising purchase plan...")
     # Pass the variable directly to optimisation (can also pass file path)
     try:
-        model, x, z, y, vendors, cards, K, unavailable_cards, available_mandatory, available_optional = optimise_purchases(
+        (
+            model,
+            x,
+            z,
+            y,
+            vendors,
+            cards,
+            K,
+            unavailable_cards,
+            mandatory_card_quantities,
+            optional_card_quantities,
+        ) = optimise_purchases(
             price_data,  # Pass variable instead of file path
             config["shipping_costs"], 
             config["vendor_penalty"],
@@ -197,7 +208,19 @@ def main():
     
     # Save results
     print("\n4. Saving results...")
-    save_results(model, x, z, y, vendors, cards, K, config["shipping_costs"], unavailable_cards, available_mandatory, available_optional)
+    save_results(
+        model,
+        x,
+        z,
+        y,
+        vendors,
+        cards,
+        K,
+        config["shipping_costs"],
+        unavailable_cards,
+        mandatory_card_quantities,
+        optional_card_quantities,
+    )
     
     print("\n" + "=" * 60)
     print("Optimisation complete!")

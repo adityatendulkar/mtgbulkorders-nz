@@ -1,15 +1,57 @@
 Status: Optimal
 
-Use vendor: hobbymaster (shipping: $2.00)
-  Buy rune-scarred demon at $1.90
-  Buy woodland cemetery at $1.00
-  Subtotal for hobbymaster: $4.90
+Use vendor: baydragon (shipping: $0.00)
+  Buy 2x intimidation tactics at $0.54 each (line total: $1.08)
+  Buy soul-guide lantern at $0.46 each (line total: $0.46)
+  Buy 11x swamp at $0.30 each (line total: $3.30)
+  Subtotal for baydragon: $4.84
 
 Use vendor: calicokeep (shipping: $6.00)
-  Buy darkbore pathway // slitherbore pathway at $7.90
-  Buy blooming marsh at $2.80
-  Buy tooth and nail at $3.40
-  Subtotal for calicokeep: $20.10
+  Buy 3x deadly cover-up at $1.30 each (line total: $3.90)
+  Buy 4x gloomlake verge at $29.90 each (line total: $119.60)
+  Buy 2x multiversal passage at $23.90 each (line total: $47.80)
+  Buy 3x quantum riddler at $62.60 each (line total: $187.80)
+  Buy 4x requiting hex at $1.60 each (line total: $6.40)
+  Buy riverchurn monument at $4.00 each (line total: $4.00)
+  Buy 3x stock up at $16.90 each (line total: $50.70)
+  Buy 4x superior spider-man at $6.80 each (line total: $27.20)
+  Subtotal for calicokeep: $453.40
 
-Total cost (including shipping): $25.00
-Cards purchased: 5 mandatory, 0 optional
+Use vendor: cardmerchantchristchurch (shipping: $10.00)
+  Buy 3x insatiable avarice at $15.70 each (line total: $47.10)
+  Subtotal for cardmerchantchristchurch: $57.10
+
+Use vendor: cardmerchanttakapuna (shipping: $0.00)
+  Buy 3x harvester of misery at $17.00 each (line total: $51.00)
+  Buy 4x watery grave at $20.00 each (line total: $80.00)
+  Subtotal for cardmerchanttakapuna: $131.00
+
+Use vendor: hobbymaster (shipping: $2.00)
+  Buy 3x bitter triumph at $2.30 each (line total: $6.90)
+  Buy 4x deceit at $26.30 each (line total: $105.20)
+  Buy 4x duress at $0.20 each (line total: $0.80)
+  Buy 2x shoot the sheriff at $0.90 each (line total: $1.80)
+  Buy undercity sewers at $28.10 each (line total: $28.10)
+  Subtotal for hobbymaster: $144.80
+
+Use vendor: ironknightgaming (shipping: $7.50)
+  Buy 4x restless reef at $4.49 each (line total: $17.96)
+  Subtotal for ironknightgaming: $25.46
+
+Use vendor: otakumart (shipping: $0.00)
+  Buy archenemy's charm at $3.10 each (line total: $3.10)
+  Buy cruelclaw's heist at $0.50 each (line total: $0.50)
+  Buy negate at $0.27 each (line total: $0.27)
+  Subtotal for otakumart: $3.87
+
+Use vendor: shuffleandcut (shipping: $0.00)
+  Buy 3x doomsday excruciator at $3.50 each (line total: $10.50)
+  Buy outrageous robbery at $1.00 each (line total: $1.00)
+  Subtotal for shuffleandcut: $11.50
+
+Use vendor: spellbound (shipping: $0.00)
+  Buy 2x winternight stories at $8.10 each (line total: $16.20)
+  Subtotal for spellbound: $16.20
+
+Total cost (including shipping): $848.17
+Cards purchased: 75 mandatory, 0 optional

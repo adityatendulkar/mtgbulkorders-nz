@@ -226,57 +226,101 @@ def _build_complete_price_data(price_rows, vendors, cards):
     return complete
 
 
-def _build_summary(model, x, z, y, vendors, cards, K, shipping_costs, available_optional, unavailable_cards):
+def _format_card_quantity_list(card_quantities):
+    labels = []
+    for card, quantity in sorted((card_quantities or {}).items()):
+        if int(quantity) <= 1:
+            labels.append(card)
+        else:
+            labels.append(f"{card} x{int(quantity)}")
+    return labels
+
+
+def _build_summary(
+    model,
+    x,
+    z,
+    y,
+    vendors,
+    cards,
+    K,
+    shipping_costs,
+    mandatory_card_quantities,
+    optional_card_quantities,
+    unavailable_cards,
+):
     vendor_summaries = []
     total_cost = 0.0
+    total_card_cost = 0.0
+    total_shipping_cost = 0.0
 
-    available_optional_set = set(available_optional)
+    optional_card_set = set(optional_card_quantities)
 
     for vendor in sorted(vendors):
         if x[vendor].value() != 1:
             continue
         purchased_cards = []
-        subtotal = float(shipping_costs.get(vendor, 0))
+        shipping = float(shipping_costs.get(vendor, 0))
+        subtotal = shipping
+        total_shipping_cost += shipping
         for card in sorted(cards):
-            if z[vendor, card].value() != 1:
+            quantity = int(round(z[vendor, card].value() or 0))
+            if quantity <= 0:
                 continue
             price = float(K.get((vendor, card), BIG_M))
-            subtotal += price
+            line_total = price * quantity
+            subtotal += line_total
+            total_card_cost += line_total
             purchased_cards.append(
                 {
                     "name": card,
+                    "quantity": quantity,
                     "price": round(price, 2),
-                    "optional": card in available_optional_set,
+                    "line_total": round(line_total, 2),
+                    "optional": card in optional_card_set,
                 }
             )
         total_cost += subtotal
         vendor_summaries.append(
             {
                 "vendor": vendor,
-                "shipping": round(float(shipping_costs.get(vendor, 0)), 2),
+                "shipping": round(shipping, 2),
                 "subtotal": round(subtotal, 2),
                 "cards": purchased_cards,
             }
         )
 
-    optional_not_purchased = sorted(
-        card for card in available_optional if y[card].value() == 0
-    )
+    optional_not_purchased_map = {}
+    for card, requested_quantity in optional_card_quantities.items():
+        purchased_quantity = int(round(y[card].value() or 0))
+        missing_quantity = requested_quantity - purchased_quantity
+        if missing_quantity > 0:
+            optional_not_purchased_map[card] = missing_quantity
+
+    optional_not_purchased = _format_card_quantity_list(optional_not_purchased_map)
     mandatory_count = sum(
-        1 for vendor_data in vendor_summaries for card in vendor_data["cards"] if not card["optional"]
+        card["quantity"]
+        for vendor_data in vendor_summaries
+        for card in vendor_data["cards"]
+        if not card["optional"]
     )
     optional_count = sum(
-        1 for vendor_data in vendor_summaries for card in vendor_data["cards"] if card["optional"]
+        card["quantity"]
+        for vendor_data in vendor_summaries
+        for card in vendor_data["cards"]
+        if card["optional"]
     )
 
     return {
         "status": pulp.LpStatus[model.status],
         "total_cost": round(total_cost, 2),
+        "card_cost": round(total_card_cost, 2),
+        "shipping_cost": round(total_shipping_cost, 2),
         "mandatory_count": mandatory_count,
         "optional_count": optional_count,
         "vendor_summaries": vendor_summaries,
         "optional_not_purchased": optional_not_purchased,
-        "unavailable_cards": sorted(unavailable_cards),
+        "unavailable_cards": _format_card_quantity_list(unavailable_cards),
     }
 
 
@@ -486,8 +530,8 @@ def optimise():
             cards,
             K,
             unavailable_cards,
-            available_mandatory,
-            available_optional,
+            mandatory_card_quantities,
+            optional_card_quantities,
         ) = optimise_purchases(
             complete_price_data,
             shipping_costs,
@@ -513,8 +557,8 @@ def optimise():
         K,
         shipping_costs,
         unavailable_cards,
-        available_mandatory,
-        available_optional,
+        mandatory_card_quantities,
+        optional_card_quantities,
         output_file=str(RESULTS_PATH),
     )
 
@@ -527,7 +571,8 @@ def optimise():
         cards,
         K,
         shipping_costs,
-        available_optional,
+        mandatory_card_quantities,
+        optional_card_quantities,
         unavailable_cards,
     )
     summary["results_file"] = str(RESULTS_PATH)

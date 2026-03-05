@@ -93,14 +93,14 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
                 
                 if r.status_code != 200:
                     if attempt < max_attempts - 1:
-                        time.sleep(0.5)
+                        time.sleep(0.2)
                         continue
                     print(f" - Failed (status {r.status_code})")
                     break
                 
                 if not r.text.strip():
                     if attempt < max_attempts - 1:
-                        time.sleep(0.5)
+                        time.sleep(0.2)
                         continue
                     print(f" - Empty response")
                     break
@@ -108,7 +108,7 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
                 content_type = r.headers.get("Content-Type", "").lower()
                 if "application/json" not in content_type:
                     if attempt < max_attempts - 1:
-                        time.sleep(0.5)
+                        time.sleep(0.2)
                         continue
                     print(f" - Unexpected content type: {content_type or 'unknown'}")
                     break
@@ -117,7 +117,7 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
                     data = r.json()
                 except json.JSONDecodeError:
                     if attempt < max_attempts - 1:
-                        time.sleep(0.5)
+                        time.sleep(0.2)
                         continue
                     print(f" - Invalid JSON")
                     break
@@ -148,15 +148,15 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
             except requests.exceptions.RequestException as e:
                 if attempt < max_attempts - 1:
                     print(f" - Attempt {attempt + 1} failed, retrying...")
-                    time.sleep(3 + attempt * 2)  # Increasing delay
+                    time.sleep(0.5 + attempt * 0.5)  # Smaller increasing backoff
                 else:
                     print(f" - All attempts failed")
             finally:
                 session.close()
         
-        # Longer delay between cards to be more gentle
+        # Delay between cards
         if idx < total_unique:
-            time.sleep(1 + (idx % 3))  # 1-3 second delay
+            time.sleep(0.2)
     
     # Build structured data for MILP (canonical card names so they match app.py _clean_tag)
     all_cards_canonical = [_normalise_card_name(c) for c in all_cards]

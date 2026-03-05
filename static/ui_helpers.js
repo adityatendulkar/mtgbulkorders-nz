@@ -30,7 +30,7 @@
 
   const STORE_LABEL_OVERRIDES = {
     badgerssett: "Badger's Sett",
-    baydragon: "Bay Dragon",
+    baydragon: "BayDragon",
     beadnd: "BeaDnD",
     calicokeep: "Calico Keep",
     cardbard: "Card Bard",
