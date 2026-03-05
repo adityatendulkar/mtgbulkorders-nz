@@ -6,3 +6,9 @@ venv/
 superset/
 .superset/
 results.txt
+build/
+dist/
+*.dmg
+*.msi
+*.exe
+*.zip

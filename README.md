@@ -1,41 +1,59 @@
 # Card Optimiser
 
-Optimises bulk purchases from the website mtgsingles.co.nz, allowing you to make bulk orders and automatically determine where to order cards from to minimise costs.
+Optimises bulk purchases from mtgsingles.co.nz, letting you compare stores and minimise total order cost.
 
-## Usage
+## Usage (CLI)
 
-1. Configure your cards and vendors in `config.yaml`
-2. Run `python run_optimiser.py`
-3. View results in the `results/` folder
+1. Configure cards and vendors in `config.yaml`.
+2. Run `python run_optimiser.py`.
+3. Check output in `results.txt`.
 
-## Flask GUI
-
-You can also run a browser GUI:
-
-### Development Mode
-
-1. Install Flask (if not already installed): `pip install flask`
-2. Start the app: `python app.py`
-3. Open `http://127.0.0.1:5000`
-
-### Production Mode with Gunicorn
-
-For production deployment, use Gunicorn:
+## Usage (Web UI, local)
 
 1. Install dependencies: `pip install -r requirements.txt`
-2. Run with Gunicorn: `gunicorn -c gunicorn_config.py app:app`
-3. The app will be available at `http://0.0.0.0:8000`
+2. Start app: `python app.py`
+3. Open `http://127.0.0.1:5000`
 
-You can customize the configuration by editing `gunicorn_config.py` or override settings via command line:
-- `gunicorn -c gunicorn_config.py --bind 0.0.0.0:8080 app:app` (custom port)
-- `gunicorn -c gunicorn_config.py --workers 4 app:app` (custom worker count)
+## Usage (Desktop app, local)
 
-The GUI lets you choose:
-- Pickup cities
-- Stores/vendors
-- Mandatory and optional cards
-- Card tags (chip-based selector)
-- Tag constraints
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run desktop launcher: `python desktop_main.py`
+
+The desktop launcher starts the Flask server locally and opens a native app window.
+
+## Build Desktop Packages
+
+### macOS (.app + .dmg)
+
+1. `bash scripts/build_desktop_mac.sh`
+2. Output:
+- `dist/CardOptimiser.app`
+- `dist/CardOptimiser-mac.dmg`
+
+### Windows (.exe folder + .zip + optional installer)
+
+1. `powershell -ExecutionPolicy Bypass -File scripts/build_desktop_windows.ps1`
+2. Output:
+- `dist/CardOptimiser/` (contains `CardOptimiser.exe`)
+- `dist/CardOptimiser-windows.zip`
+- `dist/CardOptimiserSetup.exe` (if Inno Setup `ISCC.exe` is installed)
+
+## Publish Downloads via GitHub
+
+This repo includes a GitHub Actions workflow that builds desktop packages and publishes them to GitHub Releases when you push a version tag (`v*`).
+
+1. Commit and push your changes.
+2. Create and push a version tag:
+   - `git tag v1.0.0`
+   - `git push origin v1.0.0`
+3. Wait for workflow `Build Desktop Packages` to finish.
+4. Open GitHub Releases. Your release will include:
+   - `CardOptimiser-mac.dmg`
+   - `CardOptimiser-windows.zip`
+
+Direct download URLs (for website buttons):
+- `https://github.com/<owner>/<repo>/releases/latest/download/CardOptimiser-mac.dmg`
+- `https://github.com/<owner>/<repo>/releases/latest/download/CardOptimiser-windows.zip`
 
 ## Configuration
 
@@ -47,9 +65,7 @@ Edit `config.yaml` to set:
 - Optional cards and minimums
 - Card tags and tag constraints
 
-### Card Tagging (Optional)
-
-You can add tags to cards to control how many of each type are selected:
+### Card Tagging Example
 
 ```yaml
 optional_cards:
@@ -58,17 +74,13 @@ optional_cards:
 
 tag_constraints:
   black:
-    minimum: 5    # At least 5 black cards
-    maximum: 10   # At most 10 black cards
+    minimum: 5
+    maximum: 10
   sacrifice:
-    target: 3     # Exactly 3 sacrifice cards
+    target: 3
 ```
 
-The optimizer will automatically validate constraints and report errors if they cannot be satisfied.
+## Notes
 
-## Requirements
-
-- Python 3.x
-- PuLP (optimisation)
-- PyYAML
-- requests/BeautifulSoup (price scraping)
+- Desktop mode stores writable data (config/results/cache) in a user app-data directory.
+- `requirements-build.txt` includes build-only tooling (`pyinstaller`).

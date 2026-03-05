@@ -4,6 +4,7 @@ Flask GUI for the MTG card optimiser.
 
 import copy
 import json
+import os
 from pathlib import Path
 from queue import Queue, Empty
 import threading
@@ -19,11 +20,14 @@ from price_scraper import scrape_prices
 from run_optimiser import load_config, parse_card_with_tags
 
 
-CONFIG_PATH = Path("config.yaml")
-RESULTS_PATH = Path("results.txt")
+APP_DATA_DIR = Path(os.environ.get("CARD_OPTIMISER_DATA_DIR", ".")).expanduser().resolve()
+APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+CONFIG_PATH = APP_DATA_DIR / "config.yaml"
+RESULTS_PATH = APP_DATA_DIR / "results.txt"
 
 SCRYFALL_CATALOG_URL = "https://api.scryfall.com/catalog/card-names"
-SCRYFALL_CACHE_PATH = Path("data/scryfall_card_names.json")
+SCRYFALL_CACHE_PATH = APP_DATA_DIR / "data" / "scryfall_card_names.json"
 SCRYFALL_CACHE_MAX_AGE_SEC = 7 * 24 * 60 * 60  # 7 days
 CARD_NAMES_MAX_SUGGESTIONS = 10
 

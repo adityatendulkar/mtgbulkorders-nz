@@ -4,7 +4,7 @@ import multiprocessing
 import os
 
 # Server socket
-# Render provides PORT environment variable, default to 8000 for local development
+# Hosting platforms provide PORT; default to 8000 for local development
 port = os.environ.get("PORT", "8000")
 bind = f"0.0.0.0:{port}"
 backlog = 2048
@@ -36,4 +36,3 @@ tmp_upload_dir = None
 # SSL (uncomment and configure if needed)
 # keyfile = None
 # certfile = None
-
