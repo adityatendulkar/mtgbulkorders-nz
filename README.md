@@ -12,9 +12,23 @@ Optimises bulk purchases from the website mtgsingles.co.nz, allowing you to make
 
 You can also run a browser GUI:
 
+### Development Mode
+
 1. Install Flask (if not already installed): `pip install flask`
 2. Start the app: `python app.py`
 3. Open `http://127.0.0.1:5000`
+
+### Production Mode with Gunicorn
+
+For production deployment, use Gunicorn:
+
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run with Gunicorn: `gunicorn -c gunicorn_config.py app:app`
+3. The app will be available at `http://0.0.0.0:8000`
+
+You can customize the configuration by editing `gunicorn_config.py` or override settings via command line:
+- `gunicorn -c gunicorn_config.py --bind 0.0.0.0:8080 app:app` (custom port)
+- `gunicorn -c gunicorn_config.py --workers 4 app:app` (custom worker count)
 
 The GUI lets you choose:
 - Pickup cities
