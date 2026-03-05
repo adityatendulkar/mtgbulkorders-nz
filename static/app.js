@@ -11,7 +11,9 @@
     tagLibrary: [...(initial.tag_library || [])],
     tagConstraints: [...(initial.tag_constraints || [])],
     composerTags: new Set(),
+    tagColorLookup: new Map(),
     cardNameSuggestionsList: [],
+    cardNameSuggestionIndex: -1,
     cardNameSuggestionsDebounce: null,
   };
 
@@ -59,6 +61,20 @@
     return String(name || "").trim();
   }
 
+  const uiHelpers = window.CardUiHelpers || {};
+  const TAG_COLOR_PALETTE =
+    Array.isArray(uiHelpers.tagColorPalette) && uiHelpers.tagColorPalette.length
+      ? uiHelpers.tagColorPalette
+      : [{ bg: "#f8fafc", border: "#d5dde8", ink: "#506073", activeBg: "#f1f5f9", activeBorder: "#c3cedd", activeInk: "#455567" }];
+  const formatCityLabel =
+    typeof uiHelpers.formatCityLabel === "function"
+      ? uiHelpers.formatCityLabel
+      : (city) => String(city || "");
+  const formatStoreLabel =
+    typeof uiHelpers.formatStoreLabel === "function"
+      ? uiHelpers.formatStoreLabel
+      : (store) => String(store || "");
+
   function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -90,15 +106,62 @@
     return btn;
   }
 
+  function hashString(text) {
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = (hash << 5) - hash + text.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash);
+  }
+
+  function refreshTagColorLookup() {
+    const lookup = new Map();
+    state.tagLibrary.forEach((tag, index) => {
+      lookup.set(tag, index % TAG_COLOR_PALETTE.length);
+    });
+    state.tagColorLookup = lookup;
+  }
+
+  function getTagPalette(tag) {
+    const key = cleanTag(tag);
+    if (!key) return TAG_COLOR_PALETTE[0];
+    let paletteIndex = state.tagColorLookup.get(key);
+    if (paletteIndex == null) {
+      paletteIndex = hashString(key) % TAG_COLOR_PALETTE.length;
+    }
+    return TAG_COLOR_PALETTE[paletteIndex];
+  }
+
+  function applyTagColors(node, tag) {
+    const palette = getTagPalette(tag);
+    node.style.setProperty("--tag-bg", palette.bg);
+    node.style.setProperty("--tag-border", palette.border);
+    node.style.setProperty("--tag-ink", palette.ink);
+    node.style.setProperty("--tag-active-bg", palette.activeBg);
+    node.style.setProperty("--tag-active-border", palette.activeBorder);
+    node.style.setProperty("--tag-active-ink", palette.activeInk);
+  }
+
   function syncTagLibrary() {
-    const tags = new Set(state.tagLibrary.map(cleanTag).filter(Boolean));
+    const tags = [];
+    const seen = new Set();
+    const addTag = (rawTag) => {
+      const cleaned = cleanTag(rawTag);
+      if (!cleaned || seen.has(cleaned)) return;
+      seen.add(cleaned);
+      tags.push(cleaned);
+    };
+
+    state.tagLibrary.forEach(addTag);
     [...state.mandatoryCards, ...state.optionalCards].forEach((card) => {
-      (card.tags || []).forEach((tag) => tags.add(cleanTag(tag)));
+      (card.tags || []).forEach(addTag);
     });
     (state.tagConstraints || []).forEach((row) => {
-      tags.add(cleanTag(row.tag));
+      addTag(row.tag);
     });
-    state.tagLibrary = [...tags].sort();
+    state.tagLibrary = tags;
+    refreshTagColorLookup();
   }
 
   function addTagToLibrary(tag) {
@@ -108,8 +171,20 @@
     }
     if (!state.tagLibrary.includes(cleaned)) {
       state.tagLibrary.push(cleaned);
-      state.tagLibrary.sort();
+      refreshTagColorLookup();
     }
+  }
+
+  function addComposerTagFromInput() {
+    const tag = cleanTag(els.newTagInput.value);
+    if (!tag) {
+      return;
+    }
+    addTagToLibrary(tag);
+    state.composerTags.add(tag);
+    els.newTagInput.value = "";
+    renderTagPalette();
+    renderTagDataList();
   }
 
   function setElStatus(element, message, type, baseClass, onlyAddTypeWhenMessage = false) {
@@ -132,7 +207,7 @@
   function renderCities() {
     els.cityChips.innerHTML = "";
     state.cities.forEach((city) => {
-      const btn = chipButton(city, state.selectedCities.has(city), () => {
+      const btn = chipButton(formatCityLabel(city), state.selectedCities.has(city), () => {
         if (state.selectedCities.has(city)) {
           state.selectedCities.delete(city);
         } else {
@@ -164,7 +239,7 @@
 
       const label = document.createElement("label");
       label.setAttribute("for", input.id);
-      label.textContent = vendor;
+      label.textContent = formatStoreLabel(vendor);
 
       item.appendChild(input);
       item.appendChild(label);
@@ -187,6 +262,8 @@
         }
         renderTagPalette();
       });
+      btn.classList.add("tag-chip");
+      applyTagColors(btn, tag);
       els.tagPalette.appendChild(btn);
     });
   }
@@ -243,6 +320,18 @@
         list.splice(indices[current - 1 - i], 1);
       }
     }
+  }
+
+  function removeTagFromCard(list, cardName, tagToRemove) {
+    const cardKey = String(cardName || "").trim().toLowerCase();
+    const removeKey = cleanTag(tagToRemove);
+    if (!cardKey || !removeKey) return;
+
+    list.forEach((card) => {
+      const currentKey = String(card.name || "").trim().toLowerCase();
+      if (currentKey !== cardKey) return;
+      card.tags = (card.tags || []).filter((tag) => cleanTag(tag) !== removeKey);
+    });
   }
 
   function renderCardList(kind) {
@@ -343,8 +432,15 @@
         tagRow.className = "tag-row";
         tagList.forEach((tag) => {
           const tagEl = document.createElement("span");
-          tagEl.className = "mini-tag";
+          tagEl.className = "mini-tag tag-token";
           tagEl.textContent = `#${tag}`;
+          applyTagColors(tagEl, tag);
+          tagEl.title = "Click to remove tag from this card";
+          tagEl.addEventListener("click", (e) => {
+            e.stopPropagation();
+            removeTagFromCard(list, group.name, tag);
+            renderCards();
+          });
           tagRow.appendChild(tagEl);
         });
         cardItem.appendChild(tagRow);
@@ -549,7 +645,7 @@
         return `
           <article class="vendor-result">
             <div class="vendor-head">
-              <strong>${escapeHtml(vendorSummary.vendor)}</strong>
+              <strong>${escapeHtml(formatStoreLabel(vendorSummary.vendor))}</strong>
               <span>Subtotal: $${vendorSummary.subtotal.toFixed(2)} (Shipping: $${vendorSummary.shipping.toFixed(2)})</span>
             </div>
             <div class="vendor-cards">
@@ -747,27 +843,71 @@
     els.cardNameSuggestions.innerHTML = "";
     els.cardNameSuggestions.setAttribute("aria-hidden", "true");
     state.cardNameSuggestionsList = [];
+    state.cardNameSuggestionIndex = -1;
+    els.cardNameInput.removeAttribute("aria-activedescendant");
+  }
+
+  function setCardNameSuggestionIndex(index) {
+    state.cardNameSuggestionIndex = index;
+    if (!els.cardNameSuggestions) return;
+    const options = els.cardNameSuggestions.querySelectorAll(".card-name-suggestion-item");
+    options.forEach((option, i) => {
+      const isActive = i === index;
+      option.classList.toggle("active", isActive);
+      option.setAttribute("aria-selected", isActive ? "true" : "false");
+      if (isActive) {
+        option.scrollIntoView({ block: "nearest" });
+        els.cardNameInput.setAttribute("aria-activedescendant", option.id);
+      }
+    });
+    if (index < 0) {
+      els.cardNameInput.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  function chooseCardNameSuggestion(index) {
+    const name = state.cardNameSuggestionsList[index];
+    if (!name) return false;
+    els.cardNameInput.value = name;
+    hideCardNameSuggestions();
+    return true;
+  }
+
+  function stepCardNameSuggestion(delta) {
+    const total = state.cardNameSuggestionsList.length;
+    if (!total) return false;
+    let next = state.cardNameSuggestionIndex;
+    if (next < 0) {
+      next = delta > 0 ? 0 : total - 1;
+    } else {
+      next = (next + delta + total) % total;
+    }
+    setCardNameSuggestionIndex(next);
+    return true;
   }
 
   function showCardNameSuggestions(names) {
     if (!els.cardNameSuggestions) return;
     state.cardNameSuggestionsList = names;
+    state.cardNameSuggestionIndex = -1;
     els.cardNameSuggestions.innerHTML = "";
     names.forEach((name, i) => {
       const opt = document.createElement("div");
       opt.className = "card-name-suggestion-item";
       opt.role = "option";
+      opt.id = `card-name-suggestion-${i}`;
+      opt.setAttribute("aria-selected", "false");
       opt.textContent = name;
       opt.addEventListener("click", (e) => {
         e.preventDefault();
-        els.cardNameInput.value = name;
-        hideCardNameSuggestions();
+        chooseCardNameSuggestion(i);
         els.cardNameInput.focus();
       });
       els.cardNameSuggestions.appendChild(opt);
     });
     els.cardNameSuggestions.classList.add("visible");
     els.cardNameSuggestions.setAttribute("aria-hidden", "false");
+    setCardNameSuggestionIndex(-1);
   }
 
   function fetchCardNameSuggestions(query) {
@@ -1005,22 +1145,38 @@
     });
 
     els.cardNameInput.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        if (stepCardNameSuggestion(1)) {
+          event.preventDefault();
+        }
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        if (stepCardNameSuggestion(-1)) {
+          event.preventDefault();
+        }
+        return;
+      }
       if (event.key === "Enter") {
+        if (state.cardNameSuggestionIndex >= 0 && state.cardNameSuggestionsList.length) {
+          event.preventDefault();
+          chooseCardNameSuggestion(state.cardNameSuggestionIndex);
+          return;
+        }
         event.preventDefault();
         addCard("mandatory");
       }
+      if (event.key === "Escape") {
+        hideCardNameSuggestions();
+      }
     });
 
-    els.addTagBtn.addEventListener("click", () => {
-      const tag = cleanTag(els.newTagInput.value);
-      if (!tag) {
-        return;
+    els.addTagBtn.addEventListener("click", addComposerTagFromInput);
+    els.newTagInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addComposerTagFromInput();
       }
-      addTagToLibrary(tag);
-      state.composerTags.add(tag);
-      els.newTagInput.value = "";
-      renderTagPalette();
-      renderTagDataList();
     });
 
     els.addConstraintBtn.addEventListener("click", () => {

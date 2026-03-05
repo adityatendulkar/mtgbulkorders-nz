@@ -25,7 +25,7 @@ RESULTS_PATH = Path("results.txt")
 SCRYFALL_CATALOG_URL = "https://api.scryfall.com/catalog/card-names"
 SCRYFALL_CACHE_PATH = Path("data/scryfall_card_names.json")
 SCRYFALL_CACHE_MAX_AGE_SEC = 7 * 24 * 60 * 60  # 7 days
-CARD_NAMES_MAX_SUGGESTIONS = 5
+CARD_NAMES_MAX_SUGGESTIONS = 10
 
 app = Flask(__name__)
 
