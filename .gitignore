@@ -12,3 +12,4 @@ dist/
 *.msi
 *.exe
 *.zip
+.DS_Store

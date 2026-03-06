@@ -30,12 +30,11 @@ The desktop launcher starts the Flask server locally and opens a native app wind
 - `dist/CardOptimiser.app`
 - `dist/CardOptimiser-mac.dmg`
 
-### Windows (.exe folder + .zip + optional installer)
+### Windows (single-file `.exe` + optional installer)
 
 1. `powershell -ExecutionPolicy Bypass -File scripts/build_desktop_windows.ps1`
 2. Output:
-- `dist/CardOptimiser/` (contains `CardOptimiser.exe`)
-- `dist/CardOptimiser-windows.zip`
+- `dist/CardOptimiser.exe`
 - `dist/CardOptimiserSetup.exe` (if Inno Setup `ISCC.exe` is installed)
 
 ## Publish Downloads via GitHub
@@ -49,11 +48,11 @@ This repo includes a GitHub Actions workflow that builds desktop packages and pu
 3. Wait for workflow `Build Desktop Packages` to finish.
 4. Open GitHub Releases. Your release will include:
    - `CardOptimiser-mac.dmg`
-   - `CardOptimiser-windows.zip`
+   - `CardOptimiser.exe`
 
 Direct download URLs (for website buttons):
 - `https://github.com/<owner>/<repo>/releases/latest/download/CardOptimiser-mac.dmg`
-- `https://github.com/<owner>/<repo>/releases/latest/download/CardOptimiser-windows.zip`
+- `https://github.com/<owner>/<repo>/releases/latest/download/CardOptimiser.exe`
 
 ## Configuration
 

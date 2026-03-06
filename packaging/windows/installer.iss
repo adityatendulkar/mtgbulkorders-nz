@@ -10,7 +10,7 @@ SolidCompression=yes
 WizardStyle=modern
 
 [Files]
-Source: "dist\CardOptimiser\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
+Source: "dist\CardOptimiser.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Card Optimiser"; Filename: "{app}\CardOptimiser.exe"

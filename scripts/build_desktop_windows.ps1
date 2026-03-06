@@ -5,15 +5,8 @@ Set-Location $RootDir
 
 py -m pip install --upgrade pip
 py -m pip install -r requirements-build.txt
-py -m PyInstaller --clean desktop.spec
-
-$ZipPath = Join-Path $RootDir "dist\CardOptimiser-windows.zip"
-if (Test-Path $ZipPath) {
-    Remove-Item $ZipPath -Force
-}
-Compress-Archive -Path "dist\CardOptimiser\*" -DestinationPath $ZipPath
-Write-Host "Built Windows app folder: dist\CardOptimiser"
-Write-Host "Built Windows ZIP: $ZipPath"
+py -m PyInstaller --clean desktop_windows.spec
+Write-Host "Built Windows executable: dist\CardOptimiser.exe"
 
 $InnoSetup = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
 if ($InnoSetup) {
