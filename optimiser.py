@@ -4,7 +4,9 @@ import json
 import os
 import platform
 import shutil
+import sys
 from collections import Counter
+from pathlib import Path
 import pulp
 
 # Constants
@@ -27,6 +29,43 @@ def _build_solver_candidates():
             return
         seen.add(key)
         candidates.append((name, pulp.COIN_CMD(path=abs_path, msg=False)))
+
+    def add_many(prefix, paths):
+        for idx, path in enumerate(paths, 1):
+            add_coin_solver(f"{prefix}_{idx}", path)
+
+    # Allow explicit override for packaged/runtime environments.
+    add_coin_solver("cbc_env_override", os.environ.get("CARD_OPTIMISER_CBC_PATH"))
+
+    # In frozen desktop builds, probe bundled solver locations first.
+    if getattr(sys, "frozen", False):
+        root = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        system = platform.system().lower()
+        if system == "windows":
+            add_many(
+                "cbc_frozen_windows",
+                [
+                    root / "pulp" / "solverdir" / "cbc" / "win" / "i64" / "cbc.exe",
+                    root / "pulp" / "solverdir" / "cbc" / "win" / "64" / "cbc.exe",
+                ],
+            )
+        elif system == "darwin":
+            add_many(
+                "cbc_frozen_macos",
+                [
+                    root / "pulp" / "solverdir" / "cbc" / "osx" / "arm64" / "cbc",
+                    root / "pulp" / "solverdir" / "cbc" / "osx" / "i64" / "cbc",
+                    root / "pulp" / "solverdir" / "cbc" / "osx" / "64" / "cbc",
+                ],
+            )
+        else:
+            add_many(
+                "cbc_frozen_linux",
+                [
+                    root / "pulp" / "solverdir" / "cbc" / "linux" / "i64" / "cbc",
+                    root / "pulp" / "solverdir" / "cbc" / "linux" / "64" / "cbc",
+                ],
+            )
 
     # Prefer explicitly installed CBC first.
     add_coin_solver("cbc_on_path", shutil.which("cbc"))
@@ -373,6 +412,7 @@ def optimise_purchases(K_json_or_file, shipping_costs, vendor_penalty, vendor_di
             "No compatible MILP solver could be executed.\n"
             f"   Attempted: {attempted if attempted else 'none'}\n"
             f"   - {details}\n"
+            "   In packaged desktop builds, ensure PuLP CBC binaries are bundled.\n"
             "   On Apple Silicon macOS, install native CBC with `brew install cbc`.\n"
             "   On Windows, the bundled PuLP CBC solver should work in a standard 64-bit Python environment."
         )

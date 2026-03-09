@@ -1,6 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
+from PyInstaller.utils.hooks import collect_data_files
+
+pulp_datas = collect_data_files("pulp")
 
 
 a = Analysis(
@@ -12,7 +15,7 @@ a = Analysis(
         ("static", "static"),
         ("data", "data"),
         ("config.yaml", "."),
-    ],
+    ] + pulp_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

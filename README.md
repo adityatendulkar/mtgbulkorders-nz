@@ -83,3 +83,4 @@ tag_constraints:
 
 - Desktop mode stores writable data (config/results/cache) in a user app-data directory.
 - `requirements-build.txt` includes build-only tooling (`pyinstaller`).
+- If Windows reports `No compatible MILP solver could be executed`, rebuild with current specs so bundled PuLP CBC solver files are included.
