@@ -976,7 +976,7 @@
   }
 
   const SCRAPE_LOG_OK_RESULTS = new Set(["ok"]);
-  const SCRAPE_LOG_WARN_RESULTS = new Set(["no-data", "empty"]);
+  const SCRAPE_LOG_WARN_RESULTS = new Set(["no-data", "empty", "rate-limited"]);
 
   function clearScrapeLog() {
     if (!els.scrapeLogRows) return;
@@ -1010,7 +1010,14 @@
       { cls: "scrape-log-cfray", text: headers["cf-ray"] || "—" },
       { cls: "scrape-log-cfmit", text: headers["cf-mitigated"] || "—" },
       { cls: "scrape-log-ct", text: headers["content-type"] || "—" },
-      { cls: "scrape-log-result", text: result + (entry.found != null ? ` (${entry.found})` : "") + (entry.error ? ` — ${entry.error}` : "") },
+      {
+        cls: "scrape-log-result",
+        text:
+          result +
+          (entry.found != null ? ` (${entry.found})` : "") +
+          (entry.retry_after ? ` — retrying in ${entry.retry_after}s` : "") +
+          (entry.error ? ` — ${entry.error}` : ""),
+      },
     ];
     for (const { cls, text } of cells) {
       const td = document.createElement("td");
