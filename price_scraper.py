@@ -1,8 +1,10 @@
 """Price scraping functionality for MTG Singles."""
 
-import requests
 import time
 import json
+
+from curl_cffi import requests as cffi_requests
+from curl_cffi.requests.exceptions import RequestException
 
 # Constants
 BIG_M = 9999.0  # Price representing unavailable cards
@@ -54,26 +56,17 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
             progress_callback(idx, total_unique, card)
         print(f"  [{idx}/{total_unique}] Scraping: {card}", end="")
         
-        # Create fresh session for each request to avoid connection issues
-        session = requests.Session()
-        
-        # Rotate user agents to appear more like different browsers
-        user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
-        ]
-        
+        # Fresh impersonating session per request — chrome120 fingerprint slips past Cloudflare's
+        # JA3/TLS check that blocks default Python `requests` from datacenter hosts.
+        session = cffi_requests.Session(impersonate="chrome120")
+
         HEADERS = {
-            "User-Agent": user_agents[idx % len(user_agents)],
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-NZ,en-US;q=0.9,en;q=0.8",
-            # Avoid brotli here; environments without brotli support will fail JSON parsing.
-            "Accept-Encoding": "gzip, deflate",
             "Referer": "https://mtgsingles.co.nz/",
             "Origin": "https://mtgsingles.co.nz",
             "DNT": "1",
-            "Connection": "close",  # Close connection after each request
+            "Connection": "close",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
@@ -145,7 +138,7 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
                 print(f" - Found {found_count} prices")
                 break
             
-            except requests.exceptions.RequestException as e:
+            except RequestException as e:
                 if attempt < max_attempts - 1:
                     print(f" - Attempt {attempt + 1} failed, retrying...")
                     time.sleep(0.5 + attempt * 0.5)  # Smaller increasing backoff

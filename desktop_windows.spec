@@ -1,21 +1,22 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 pulp_datas = collect_data_files("pulp")
+curl_cffi_datas, curl_cffi_binaries, curl_cffi_hiddenimports = collect_all("curl_cffi")
 
 
 a = Analysis(
     ["desktop_main.py"],
     pathex=[],
-    binaries=[],
+    binaries=curl_cffi_binaries,
     datas=[
         ("templates", "templates"),
         ("static", "static"),
         ("data", "data"),
         ("config.yaml", "."),
-    ] + pulp_datas,
-    hiddenimports=[],
+    ] + pulp_datas + curl_cffi_datas,
+    hiddenimports=curl_cffi_hiddenimports + ["_cffi_backend"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
