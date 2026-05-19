@@ -47,6 +47,11 @@
     scrapeProgressCount: document.getElementById("scrapeProgressCount"),
     scrapeProgressFill: document.getElementById("scrapeProgressFill"),
     scrapeProgressBar: document.querySelector(".scrape-progress-bar"),
+    scrapeLogToggle: document.getElementById("scrapeLogToggle"),
+    scrapeLogBody: document.getElementById("scrapeLogBody"),
+    scrapeLogRows: document.getElementById("scrapeLogRows"),
+    scrapeLogCount: document.getElementById("scrapeLogCount"),
+    scrapeLogClear: document.getElementById("scrapeLogClear"),
     resultPanel: document.getElementById("resultPanel"),
     resultBody: document.getElementById("resultBody"),
     cardNameSuggestions: document.getElementById("cardNameSuggestions"),
@@ -970,6 +975,72 @@
     }
   }
 
+  const SCRAPE_LOG_OK_RESULTS = new Set(["ok"]);
+  const SCRAPE_LOG_WARN_RESULTS = new Set(["no-data", "empty"]);
+
+  function clearScrapeLog() {
+    if (!els.scrapeLogRows) return;
+    els.scrapeLogRows.innerHTML = "";
+    if (els.scrapeLogCount) els.scrapeLogCount.textContent = "0";
+  }
+
+  function formatScrapeLogTime(ts) {
+    const d = ts ? new Date(ts * 1000) : new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function appendScrapeLogRow(entry) {
+    if (!els.scrapeLogRows) return;
+    const tr = document.createElement("tr");
+    const result = entry.result || "";
+    let rowClass = "scrape-log-row-bad";
+    if (SCRAPE_LOG_OK_RESULTS.has(result)) rowClass = "scrape-log-row-ok";
+    else if (SCRAPE_LOG_WARN_RESULTS.has(result)) rowClass = "scrape-log-row-warn";
+    tr.className = rowClass;
+
+    const headers = entry.headers || {};
+    const cells = [
+      { cls: "scrape-log-time", text: formatScrapeLogTime(entry.ts) },
+      { cls: "scrape-log-card", text: entry.card || "" },
+      { cls: "scrape-log-try", text: String(entry.attempt || "") },
+      { cls: "scrape-log-status", text: entry.status == null ? "—" : String(entry.status) },
+      { cls: "scrape-log-ms", text: entry.ms == null ? "—" : String(entry.ms) },
+      { cls: "scrape-log-server", text: headers["server"] || "—" },
+      { cls: "scrape-log-cfray", text: headers["cf-ray"] || "—" },
+      { cls: "scrape-log-cfmit", text: headers["cf-mitigated"] || "—" },
+      { cls: "scrape-log-ct", text: headers["content-type"] || "—" },
+      { cls: "scrape-log-result", text: result + (entry.found != null ? ` (${entry.found})` : "") + (entry.error ? ` — ${entry.error}` : "") },
+    ];
+    for (const { cls, text } of cells) {
+      const td = document.createElement("td");
+      td.className = cls;
+      td.textContent = text;
+      if (cls === "scrape-log-card" || cls === "scrape-log-ct" || cls === "scrape-log-result") {
+        td.title = text;
+      }
+      tr.appendChild(td);
+    }
+    els.scrapeLogRows.appendChild(tr);
+
+    if (els.scrapeLogCount) {
+      els.scrapeLogCount.textContent = String(els.scrapeLogRows.children.length);
+    }
+    if (els.scrapeLogBody && !els.scrapeLogBody.classList.contains("hidden")) {
+      els.scrapeLogBody.scrollTop = els.scrapeLogBody.scrollHeight;
+    }
+  }
+
+  function toggleScrapeLog() {
+    if (!els.scrapeLogBody || !els.scrapeLogToggle) return;
+    const willExpand = els.scrapeLogBody.classList.contains("hidden");
+    els.scrapeLogBody.classList.toggle("hidden", !willExpand);
+    els.scrapeLogToggle.setAttribute("aria-expanded", willExpand ? "true" : "false");
+  }
+
+  if (els.scrapeLogToggle) els.scrapeLogToggle.addEventListener("click", toggleScrapeLog);
+  if (els.scrapeLogClear) els.scrapeLogClear.addEventListener("click", clearScrapeLog);
+
   function updateScrapeProgress(current, total, card) {
     els.scrapeProgressLabel.textContent = card ? `Scraping: ${card}` : "Scraping prices…";
     els.scrapeProgressCount.textContent = `${current} / ${total}`;
@@ -981,7 +1052,7 @@
     }
   }
 
-  function readScrapeStream(response, onProgress) {
+  function readScrapeStream(response, onProgress, onRequest) {
     return new Promise((resolve, reject) => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -991,19 +1062,26 @@
 
       function tryParseAndHandle() {
         if (currentEvent == null || currentData == null) return false;
+        let data;
         try {
-          const data = JSON.parse(currentData);
-          if (currentEvent === "progress") {
-            onProgress(data.current, data.total, data.card);
-          } else if (currentEvent === "complete") {
-            resolve(data.price_data);
-            return true;
-          } else if (currentEvent === "error") {
-            reject(new Error(data.error || "Scrape failed"));
-            return true;
-          }
+          data = JSON.parse(currentData);
         } catch (_) {
-          return false;
+          return false;  // probably a partial data line; wait for more
+        }
+        const eventType = currentEvent;
+        // Clear before invoking side effects so we never double-fire on the blank-line terminator
+        currentEvent = null;
+        currentData = null;
+        if (eventType === "progress") {
+          onProgress(data.current, data.total, data.card);
+        } else if (eventType === "request") {
+          if (onRequest && data && data.entry) onRequest(data.entry);
+        } else if (eventType === "complete") {
+          resolve(data.price_data);
+          return true;
+        } else if (eventType === "error") {
+          reject(new Error(data.error || "Scrape failed"));
+          return true;
         }
         return false;
       }
@@ -1069,6 +1147,7 @@
       let priceData = null;
       if (useScrape) {
         showScrapeProgress(true);
+        clearScrapeLog();
         const scrapeRes = await fetch("/scrape", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1083,7 +1162,8 @@
         try {
           priceData = await readScrapeStream(
             scrapeRes,
-            (current, total, card) => updateScrapeProgress(current, total, card)
+            (current, total, card) => updateScrapeProgress(current, total, card),
+            (entry) => appendScrapeLogRow(entry)
           );
         } catch (err) {
           setStatus(err.message || "Scrape failed.", "error");

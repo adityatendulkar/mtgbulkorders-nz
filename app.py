@@ -336,6 +336,9 @@ def _stream_scrape_events(mandatory_names, optional_names, selected_vendors):
     def progress_callback(current, total, card_name):
         queue.put({"type": "progress", "current": current, "total": total, "card": card_name})
 
+    def request_log_callback(entry):
+        queue.put({"type": "request", "entry": entry})
+
     def run_scrape():
         try:
             data = scrape_prices(
@@ -343,6 +346,7 @@ def _stream_scrape_events(mandatory_names, optional_names, selected_vendors):
                 selected_vendors,
                 optional_names,
                 progress_callback=progress_callback,
+                request_log_callback=request_log_callback,
             )
             result_holder.append(data)
             queue.put({"type": "complete", "price_data": data})
@@ -360,6 +364,8 @@ def _stream_scrape_events(mandatory_names, optional_names, selected_vendors):
             break
         if event["type"] == "progress":
             yield f"event: progress\ndata: {json.dumps(event)}\n\n"
+        elif event["type"] == "request":
+            yield f"event: request\ndata: {json.dumps({'entry': event['entry']})}\n\n"
         elif event["type"] == "complete":
             yield f"event: complete\ndata: {json.dumps({'price_data': event['price_data']})}\n\n"
             break

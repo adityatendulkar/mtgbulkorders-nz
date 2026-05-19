@@ -27,11 +27,43 @@ def _normalise_card_name(name):
     return s
 
 
-def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
-    """Scrape prices from MTG Singles API. progress_callback(current, total, card_name) is called per card."""
+_LOG_HEADERS = ("server", "cf-ray", "cf-mitigated", "cf-cache-status", "content-type")
+
+
+def _build_log_entry(card, url, attempt, started_at, response=None, result=None, error=None, found=None):
+    """Compact per-request log entry for the live viewer."""
+    headers = {}
+    status = None
+    if response is not None:
+        status = response.status_code
+        for key in _LOG_HEADERS:
+            value = response.headers.get(key)
+            if value is not None:
+                headers[key] = value
+    return {
+        "card": card,
+        "url": url,
+        "method": "GET",
+        "attempt": attempt,
+        "status": status,
+        "ms": int((time.time() - started_at) * 1000),
+        "headers": headers,
+        "result": result,
+        "error": error,
+        "found": found,
+        "ts": time.time(),
+    }
+
+
+def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None, request_log_callback=None):
+    """Scrape prices from MTG Singles API.
+
+    progress_callback(current, total, card_name) fires once per card before its fetch.
+    request_log_callback(entry) fires once per HTTP attempt with a dict (see _build_log_entry).
+    """
     if optional_cards is None:
         optional_cards = []
-    
+
     url = "https://api.mtgsingles.co.nz/MtgSingle"
     
     all_cards = list(cards) + list(optional_cards)
@@ -81,17 +113,21 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
         
         max_attempts = 3
         for attempt in range(max_attempts):
+            started_at = time.time()
+            log_entry = None
             try:
                 r = session.get(url, headers=HEADERS, params=params, timeout=15)
-                
+
                 if r.status_code != 200:
+                    log_entry = _build_log_entry(card, url, attempt + 1, started_at, response=r, result="http-error")
                     if attempt < max_attempts - 1:
                         time.sleep(0.2)
                         continue
                     print(f" - Failed (status {r.status_code})")
                     break
-                
+
                 if not r.text.strip():
+                    log_entry = _build_log_entry(card, url, attempt + 1, started_at, response=r, result="empty")
                     if attempt < max_attempts - 1:
                         time.sleep(0.2)
                         continue
@@ -100,45 +136,50 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
 
                 content_type = r.headers.get("Content-Type", "").lower()
                 if "application/json" not in content_type:
+                    log_entry = _build_log_entry(card, url, attempt + 1, started_at, response=r, result="non-json")
                     if attempt < max_attempts - 1:
                         time.sleep(0.2)
                         continue
                     print(f" - Unexpected content type: {content_type or 'unknown'}")
                     break
-                
+
                 try:
                     data = r.json()
                 except json.JSONDecodeError:
+                    log_entry = _build_log_entry(card, url, attempt + 1, started_at, response=r, result="bad-json")
                     if attempt < max_attempts - 1:
                         time.sleep(0.2)
                         continue
                     print(f" - Invalid JSON")
                     break
-                
+
                 if not data:
+                    log_entry = _build_log_entry(card, url, attempt + 1, started_at, response=r, result="no-data", found=0)
                     print(f" - No results")
                     break
-                
+
                 found_count = 0
                 for listing in data:
                     if card.lower() not in listing["title"].lower():
                         continue
-                    
+
                     price = float(listing["price"].replace("$", "").replace(",", ""))
                     vendor = listing["store"].replace("NZ/", "").lower()
                     card_name = _normalise_card_name(card)
-                    
+
                     key = (card_name, vendor)
-                    
+
                     # Keep cheapest price only
                     if key not in K or price < K[key]:
                         K[key] = price
                         found_count += 1
-                
+
+                log_entry = _build_log_entry(card, url, attempt + 1, started_at, response=r, result="ok", found=found_count)
                 print(f" - Found {found_count} prices")
                 break
-            
+
             except RequestException as e:
+                log_entry = _build_log_entry(card, url, attempt + 1, started_at, result="network-error", error=str(e))
                 if attempt < max_attempts - 1:
                     print(f" - Attempt {attempt + 1} failed, retrying...")
                     time.sleep(0.5 + attempt * 0.5)  # Smaller increasing backoff
@@ -146,6 +187,11 @@ def scrape_prices(cards, vendors, optional_cards=None, progress_callback=None):
                     print(f" - All attempts failed")
             finally:
                 session.close()
+                if log_entry is not None and request_log_callback is not None:
+                    try:
+                        request_log_callback(log_entry)
+                    except Exception:
+                        pass  # never let the viewer break scraping
         
         # Delay between cards
         if idx < total_unique:

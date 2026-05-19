@@ -145,6 +145,35 @@
               <div class="scrape-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
                 <div id="scrapeProgressFill" class="scrape-progress-fill"></div>
               </div>
+              <div id="scrapeLogWrap" class="scrape-log-wrap">
+                <div class="scrape-log-head">
+                  <button type="button" id="scrapeLogToggle" class="scrape-log-toggle" aria-expanded="false" aria-controls="scrapeLogBody">
+                    <span class="scrape-log-caret" aria-hidden="true">▶</span>
+                    <span>Request log</span>
+                    <span id="scrapeLogCount" class="scrape-log-count">0</span>
+                  </button>
+                  <button type="button" id="scrapeLogClear" class="scrape-log-clear">clear</button>
+                </div>
+                <div id="scrapeLogBody" class="scrape-log-body hidden">
+                  <table class="scrape-log-table">
+                    <thead>
+                      <tr>
+                        <th>time</th>
+                        <th>card</th>
+                        <th>try</th>
+                        <th>status</th>
+                        <th>ms</th>
+                        <th>server</th>
+                        <th>cf-ray</th>
+                        <th>cf-mitigated</th>
+                        <th>content-type</th>
+                        <th>result</th>
+                      </tr>
+                    </thead>
+                    <tbody id="scrapeLogRows"></tbody>
+                  </table>
+                </div>
+              </div>
             </div>
             <p id="runStatus" class="status"></p>
           </div>
